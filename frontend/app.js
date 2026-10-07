@@ -196,6 +196,7 @@ async function loadInitialTrains() {
 
 function renderFeaturedTrains() {
   const container = document.getElementById("home-featured-trains");
+  if (!container) return;
   if (!state.allTrains || state.allTrains.length === 0) {
     container.innerHTML = "<p class='text-muted'>No active trains found.</p>";
     return;

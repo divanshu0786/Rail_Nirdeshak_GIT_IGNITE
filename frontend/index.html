@@ -115,20 +115,10 @@
               </div>
             </div>
 
-            <!-- Popular & Recent Route Shortcuts -->
-            <div class="route-shortcuts-row">
-              <div class="shortcut-group">
-                <span class="shortcut-title"><i class="fa-solid fa-fire text-amber"></i> Popular Routes:</span>
-                <span class="route-pill" onclick="setRouteAndSearch('NDLS', 'ASR')">NDLS → ASR</span>
-                <span class="route-pill" onclick="setRouteAndSearch('ASR', 'NDLS')">ASR → NDLS</span>
-                <span class="route-pill" onclick="setRouteAndSearch('NDLS', 'KLK')">NDLS → KLK</span>
-                <span class="route-pill" onclick="setRouteAndSearch('KLK', 'NDLS')">KLK → NDLS</span>
-                <span class="route-pill" onclick="setRouteAndSearch('BTI', 'SSA')">BTI → SSA</span>
-              </div>
-              <div class="shortcut-group hidden" id="recent-searches-wrap">
-                <span class="shortcut-title"><i class="fa-solid fa-clock-rotate-left text-cyan"></i> Recent:</span>
-                <div id="recent-searches-list" class="recent-pills-list"></div>
-              </div>
+            <!-- Recent Searches (shown dynamically when history exists) -->
+            <div class="route-shortcuts-row hidden" id="recent-searches-wrap">
+              <span class="shortcut-title"><i class="fa-solid fa-clock-rotate-left"></i> Recent Searches:</span>
+              <div id="recent-searches-list" class="recent-pills-list"></div>
             </div>
           </div>
 
@@ -147,7 +137,7 @@
           <!-- Station Search Results Section -->
           <div id="station-search-results-box" class="search-results-section hidden">
             <div class="results-header">
-              <h3 id="search-results-title"><i class="fa-solid fa-train-subway text-cyan"></i> Available Trains</h3>
+              <h3 id="search-results-title"><i class="fa-solid fa-train-subway"></i> Available Trains</h3>
               <button class="btn btn-sm btn-outline" onclick="closeSearchResults()"><i class="fa-solid fa-xmark"></i> Close</button>
             </div>
             <div id="station-search-results-list" class="station-results-grid"></div>
@@ -155,20 +145,9 @@
         </div>
       </div>
 
-      <!-- Quick Status Highlights & Seeded Trains -->
-      <div class="container mt-4">
-        <div class="section-header">
-          <h2><i class="fa-solid fa-fire text-amber"></i> Active Demonstration Corridors</h2>
-          <span class="badge-tag">Northern Railway Live Telemetry</span>
-        </div>
-
-        <div class="train-grid" id="home-featured-trains">
-          <!-- Populated dynamically via JS -->
-          <div class="skeleton-card">Loading live trains...</div>
-        </div>
-
-        <!-- System Unique Highlights -->
-        <div class="highlights-grid mt-5">
+      <!-- System Architecture & Capabilities -->
+      <div class="container mt-4 mb-5">
+        <div class="highlights-grid">
           <div class="feature-card">
             <div class="f-icon"><i class="fa-solid fa-calculator"></i></div>
             <h3>Dynamic Recalculation</h3>
