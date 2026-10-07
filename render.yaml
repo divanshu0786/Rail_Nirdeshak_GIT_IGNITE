@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: rail-nirdeshak
+    runtime: python
+    buildCommand: "pip install -r requirements.txt && python backend/seed_data.py"
+    startCommand: "uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        value: sqlite:///./rail_nirdeshak.db
