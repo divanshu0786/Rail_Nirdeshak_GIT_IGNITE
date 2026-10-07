@@ -537,6 +537,26 @@ function connectTrainWebSocket(trainId) {
 }
 
 // ----------------- SIMULATION STEPPER -----------------
+let historicalCursor = 0;
+
+async function replayNextHistoricalPoint() {
+  if (!state.currentTrain) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/telemetry/apply-history-point/${state.currentTrain.train_number}?point_idx=${historicalCursor}`, {
+      method: "POST"
+    });
+    if (res.ok) {
+      const data = await res.json();
+      historicalCursor = (historicalCursor + 1) % 50;
+      showToast(`📊 6-Month Log Replay (Pt #${historicalCursor}): ${data.applied_point.current_station} | Speed: ${data.applied_point.speed_kmh}km/h | Delay: +${data.applied_point.delay_min}m`, "success");
+    } else {
+      showToast("No historical log samples available for this train", "info");
+    }
+  } catch (e) {
+    showToast("Historical replay request failed", "danger");
+  }
+}
+
 async function triggerSimulateStep(delayDelta, speed) {
   if (!state.currentTrain) return;
   try {

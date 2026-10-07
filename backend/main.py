@@ -279,6 +279,67 @@ async def simulate_step(train_id: int, delay_delta: int = 2, speed: float = 75.0
 
     return {"status": "success", "train_number": train.train_number, "new_delay": train.live_state.current_delay_min}
 
+@app.get("/api/telemetry/history-samples/{train_number}")
+def get_history_samples(train_number: str):
+    import csv
+    csv_file = os.path.join(os.path.dirname(__file__), "..", "data", "ruhani_12497_shan_e_punjab_6months.csv")
+    if not os.path.exists(csv_file):
+        return []
+    
+    samples = []
+    with open(csv_file, mode="r", encoding="utf-8", errors="ignore") as f:
+        reader = csv.DictReader(f)
+        for idx, row in enumerate(reader):
+            if idx % 15 == 0: # Sample every 15th row for smooth scrubbing
+                samples.append({
+                    "timestamp": row.get("Timestamp") or row.get("Date"),
+                    "latitude": float(row.get("Latitude", 28.6434)),
+                    "longitude": float(row.get("Longitude", 77.2196)),
+                    "speed_kmh": float(row.get("Current_Speed", 80)),
+                    "delay_min": int(float(row.get("Current_Delay", 0))),
+                    "current_station": row.get("Current_Station", ""),
+                    "next_station": row.get("Next_Station", "")
+                })
+            if len(samples) >= 50:
+                break
+    return samples
+
+@app.post("/api/telemetry/apply-history-point/{train_number}")
+async def apply_history_point(train_number: str, point_idx: int = 0, db: Session = Depends(get_db)):
+    samples = get_history_samples(train_number)
+    if not samples or point_idx >= len(samples):
+        raise HTTPException(status_code=400, detail="Invalid sample point")
+    
+    pt = samples[point_idx]
+    train = db.query(models.Train).filter(models.Train.train_number == train_number).first()
+    if not train or not train.live_state:
+        raise HTTPException(status_code=404, detail="Train not found")
+
+    train.live_state.latitude = pt["latitude"]
+    train.live_state.longitude = pt["longitude"]
+    train.live_state.speed_kmh = pt["speed_kmh"]
+    train.live_state.current_delay_min = pt["delay_min"]
+    train.live_state.last_updated = datetime.utcnow()
+    db.commit()
+
+    preds = calculate_dynamic_eta(db, train, train.live_state)
+    payload = {
+        "type": "TELEMETRY_UPDATE",
+        "train_id": train.id,
+        "train_number": train.train_number,
+        "speed_kmh": train.live_state.speed_kmh,
+        "latitude": train.live_state.latitude,
+        "longitude": train.live_state.longitude,
+        "current_delay_min": train.live_state.current_delay_min,
+        "reference_pole": train.live_state.reference_pole,
+        "predictions_count": len(preds),
+        "timestamp": train.live_state.last_updated.isoformat()
+    }
+    await manager.broadcast_train_update(train.id, payload)
+    await manager.broadcast_control_room(payload)
+
+    return {"status": "success", "applied_point": pt}
+
 # ----------------- SAVED TRAINS (MY TRAINS) -----------------
 @app.get("/api/saved-trains")
 def get_saved_trains(user: models.User = Depends(require_current_user), db: Session = Depends(get_db)):

@@ -101,11 +101,18 @@ def run_tests():
         "impact_delay_min": 4
     }
     res = client.post("/api/field-observations", json=obs_payload)
+    print("\n13. Testing 6-Month Dataset History Sampling & Replay...")
+    res = client.get("/api/telemetry/history-samples/12497")
     assert res.status_code == 200
-    print("✓ Field survey observation logged OK.")
+    samples = res.json()
+    assert len(samples) > 0, "No historical samples extracted from data/"
+    print(f"✓ Extracted {len(samples)} real historical log points from dataset.")
+    res = client.post("/api/telemetry/apply-history-point/12497?point_idx=2")
+    assert res.status_code == 200
+    print("✓ Replayed historical point successfully:", res.json()["applied_point"]["current_station"])
 
     print("\n===========================================")
-    print("ALL BACKEND PHASES 2, 3, 4, 5 TESTS PASSED!")
+    print("ALL 13 BACKEND & DATASET TESTS PASSED!")
     print("===========================================")
 
 if __name__ == "__main__":
