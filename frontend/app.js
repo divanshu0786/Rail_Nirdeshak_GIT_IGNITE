@@ -69,29 +69,71 @@ async function initAuth() {
 }
 
 function updateUserUI() {
-  const authSection = document.getElementById("user-auth-section");
+  const profileBtn = document.getElementById("profile-btn");
+  const profileIcon = document.getElementById("profile-nav-icon");
+  if (!profileBtn) return;
+
   if (state.user) {
-    authSection.innerHTML = `
-      <div class="user-logged-box" style="display:flex; align-items:center; gap:0.6rem;">
-        <span style="font-size:0.85rem; font-weight:600;"><i class="fa-solid fa-user-check text-cyan"></i> ${state.user.full_name}</span>
-        <button class="btn btn-sm btn-outline" onclick="logout()"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
-      </div>
-    `;
+    profileBtn.setAttribute("title", `${state.user.full_name} (${state.user.role}) - Account Profile`);
+    profileBtn.classList.add("logged-in");
+    if (profileIcon) {
+      profileIcon.className = "fa-solid fa-user-check";
+    }
   } else {
-    authSection.innerHTML = `
-      <button class="btn btn-outline" id="auth-btn" onclick="openAuthModal()">
-        <i class="fa-solid fa-user"></i> <span>Sign In</span>
-      </button>
-    `;
+    profileBtn.setAttribute("title", "Sign In / Guest Profile");
+    profileBtn.classList.remove("logged-in");
+    if (profileIcon) {
+      profileIcon.className = "fa-solid fa-user";
+    }
   }
 }
 
+function openProfileModal() {
+  const modal = document.getElementById("auth-modal");
+  const modalTitle = document.getElementById("modal-title");
+  const profileView = document.getElementById("profile-view-section");
+  const authTabs = document.getElementById("auth-tabs-section");
+  const loginForm = document.getElementById("login-form");
+  const regForm = document.getElementById("register-form");
+
+  if (!modal) return;
+
+  if (state.user) {
+    // Logged in user profile
+    if (modalTitle) modalTitle.innerHTML = `<i class="fa-solid fa-circle-user"></i> Account Profile`;
+    if (profileView) profileView.classList.remove("hidden");
+    if (authTabs) authTabs.classList.add("hidden");
+    if (loginForm) loginForm.classList.add("hidden");
+    if (regForm) regForm.classList.add("hidden");
+
+    // Fill user info
+    const nameEl = document.getElementById("profile-user-name");
+    const emailEl = document.getElementById("profile-user-email");
+    const roleEl = document.getElementById("profile-user-role");
+    const savedEl = document.getElementById("profile-saved-count");
+
+    if (nameEl) nameEl.textContent = state.user.full_name || "User";
+    if (emailEl) emailEl.textContent = state.user.email || "";
+    if (roleEl) roleEl.textContent = state.user.role === "controller" ? "Zone Controller" : "Passenger";
+    if (savedEl) savedEl.textContent = `${state.savedTrains ? state.savedTrains.length : 0} Saved Trains`;
+  } else {
+    // Guest user -> show login/register
+    if (modalTitle) modalTitle.innerHTML = `<i class="fa-solid fa-right-to-bracket"></i> Sign In to Rail Nirdeshak`;
+    if (profileView) profileView.classList.add("hidden");
+    if (authTabs) authTabs.classList.remove("hidden");
+    switchAuthTab("login");
+  }
+
+  modal.classList.remove("hidden");
+}
+
 function openAuthModal() {
-  document.getElementById("auth-modal").classList.remove("hidden");
+  openProfileModal();
 }
 
 function closeAuthModal() {
-  document.getElementById("auth-modal").classList.add("hidden");
+  const modal = document.getElementById("auth-modal");
+  if (modal) modal.classList.add("hidden");
 }
 
 function switchAuthTab(type) {
@@ -101,15 +143,15 @@ function switchAuthTab(type) {
   const tabReg = document.getElementById("tab-btn-register");
 
   if (type === "login") {
-    loginForm.classList.remove("hidden");
-    regForm.classList.add("hidden");
-    tabLogin.classList.add("active");
-    tabReg.classList.remove("active");
+    if (loginForm) loginForm.classList.remove("hidden");
+    if (regForm) regForm.classList.add("hidden");
+    if (tabLogin) tabLogin.classList.add("active");
+    if (tabReg) tabReg.classList.remove("active");
   } else {
-    loginForm.classList.add("hidden");
-    regForm.classList.remove("hidden");
-    tabLogin.classList.remove("active");
-    tabReg.classList.add("active");
+    if (loginForm) loginForm.classList.add("hidden");
+    if (regForm) regForm.classList.remove("hidden");
+    if (tabLogin) tabLogin.classList.remove("active");
+    if (tabReg) tabReg.classList.add("active");
   }
 }
 
@@ -162,6 +204,7 @@ async function handleRegister(e) {
       updateUserUI();
       closeAuthModal();
       showToast(`Account created for ${state.user.full_name}!`, "success");
+      loadSavedTrains();
     } else {
       showToast(data.detail || "Registration failed", "danger");
     }
@@ -176,6 +219,7 @@ function logout() {
   localStorage.removeItem("rn_token");
   updateUserUI();
   showToast("Signed out successfully", "info");
+  loadSavedTrains();
 }
 
 // ----------------- DATA LOADING -----------------

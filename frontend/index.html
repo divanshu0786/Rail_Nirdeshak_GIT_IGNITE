@@ -23,7 +23,6 @@
         <div class="logo-icon"><i class="fa-solid fa-train-subway"></i></div>
         <div class="logo-text">
           <span class="brand-title">RAIL NIRDESHAK</span>
-          <span class="brand-subtitle">Dynamic ETA & Propagation Intelligence</span>
         </div>
       </div>
 
@@ -46,14 +45,9 @@
       </nav>
 
       <div class="header-actions">
-        <div class="ws-status-badge" id="ws-indicator" title="WebSocket Live Stream Status">
-          <span class="pulse-dot"></span> <span id="ws-status-text">Live Sync</span>
-        </div>
-        <div class="user-auth-panel" id="user-auth-section">
-          <button class="btn btn-outline" id="auth-btn" onclick="openAuthModal()">
-            <i class="fa-solid fa-user"></i> <span id="auth-btn-text">Sign In</span>
-          </button>
-        </div>
+        <button class="profile-nav-btn" id="profile-btn" onclick="openProfileModal()" title="Account Profile">
+          <i class="fa-solid fa-user" id="profile-nav-icon"></i>
+        </button>
       </div>
     </div>
   </header>
@@ -482,7 +476,7 @@
 
   </main>
 
-  <!-- Auth Modal -->
+  <!-- Auth & Profile Modal -->
   <div id="auth-modal" class="modal-overlay hidden">
     <div class="modal-card">
       <div class="modal-header">
@@ -490,7 +484,43 @@
         <button class="close-btn" onclick="closeAuthModal()">&times;</button>
       </div>
       <div class="modal-body">
-        <div class="auth-tabs">
+        
+        <!-- Profile Card View (Shown for Logged In User) -->
+        <div id="profile-view-section" class="profile-card-modal hidden">
+          <div class="profile-header-card">
+            <div class="profile-avatar-large">
+              <i class="fa-solid fa-user"></i>
+            </div>
+            <div class="profile-header-info">
+              <h3 id="profile-user-name" class="profile-name">Rajesh Sharma</h3>
+              <p id="profile-user-email" class="profile-email">passenger@railnirdeshak.in</p>
+            </div>
+          </div>
+          
+          <div class="profile-details-list mt-3">
+            <div class="profile-detail-item">
+              <span class="detail-label"><i class="fa-solid fa-shield-halved"></i> Role</span>
+              <span id="profile-user-role" class="badge-tag">Passenger</span>
+            </div>
+            <div class="profile-detail-item">
+              <span class="detail-label"><i class="fa-solid fa-bookmark"></i> Saved Trains</span>
+              <span id="profile-saved-count" class="badge-tag">0 Trains</span>
+            </div>
+            <div class="profile-detail-item">
+              <span class="detail-label"><i class="fa-solid fa-circle-check" style="color:var(--success);"></i> Session Status</span>
+              <span class="badge-tag" style="color:var(--success); border-color:var(--success);">Authenticated</span>
+            </div>
+          </div>
+
+          <div class="profile-actions-row mt-4">
+            <button type="button" class="btn btn-danger btn-block" onclick="logout(); closeAuthModal();">
+              <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
+            </button>
+          </div>
+        </div>
+
+        <!-- Auth Tabs (Shown for Guests) -->
+        <div id="auth-tabs-section" class="auth-tabs">
           <button class="auth-tab active" id="tab-btn-login" onclick="switchAuthTab('login')">Login</button>
           <button class="auth-tab" id="tab-btn-register" onclick="switchAuthTab('register')">Register</button>
         </div>
