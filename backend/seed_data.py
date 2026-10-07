@@ -235,11 +235,15 @@ def seed():
             reason_summary="Yard approach congestion (+6m) + Signal (+3m) - Scheduled buffer (-2m)"
         )
         db.add_all([pred1, pred2, pred3, pred4])
-        db.commit()
-
-        print("Database seeded successfully with Trains 12497, 12011, stations, field surveys and predictions.")
+        print("Database base seeded successfully with Trains 12497, 12011, stations, field surveys and predictions.")
     finally:
         db.close()
+
+    try:
+        from data_loader import load_all_data
+        load_all_data()
+    except Exception as e:
+        print("Data loader note:", e)
 
 if __name__ == "__main__":
     seed()

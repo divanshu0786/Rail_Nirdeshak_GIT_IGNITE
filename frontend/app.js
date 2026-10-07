@@ -27,6 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadInitialTrains();
   loadControlRoom();
   setupSearchDropdown();
+  setupStationAutocomplete();
 });
 
 // ----------------- TAB NAVIGATION -----------------
@@ -219,10 +220,266 @@ function renderFeaturedTrains() {
   `).join("");
 }
 
-// ----------------- SEARCH & AUTOCOMPLETE -----------------
+// ----------------- DUAL SEARCH & STATION AUTOCOMPLETE -----------------
+function switchSearchMode(mode) {
+  const tabStation = document.getElementById("tab-btn-station-search");
+  const tabTrain = document.getElementById("tab-btn-train-search");
+  const formStation = document.getElementById("station-search-form");
+  const formTrain = document.getElementById("train-num-search-form");
+
+  if (mode === "station") {
+    tabStation.classList.add("active");
+    tabTrain.classList.remove("active");
+    formStation.classList.remove("hidden");
+    formTrain.classList.add("hidden");
+  } else {
+    tabStation.classList.remove("active");
+    tabTrain.classList.add("active");
+    formStation.classList.add("hidden");
+    formTrain.classList.remove("hidden");
+  }
+}
+
+function setupStationAutocomplete() {
+  const fromInput = document.getElementById("from-station-input");
+  const toInput = document.getElementById("to-station-input");
+  const fromDropdown = document.getElementById("from-station-dropdown");
+  const toDropdown = document.getElementById("to-station-dropdown");
+
+  async function handleStationInput(inputEl, dropdownEl) {
+    const q = inputEl.value.trim();
+    if (q.length < 1) {
+      dropdownEl.classList.add("hidden");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/stations?query=${encodeURIComponent(q)}`);
+      if (!res.ok) return;
+      const stations = await res.json();
+
+      if (stations.length === 0) {
+        dropdownEl.innerHTML = `<div class="search-dropdown-item text-muted">No station matches "${q}"</div>`;
+      } else {
+        dropdownEl.innerHTML = stations.slice(0, 8).map(s => `
+          <div class="search-dropdown-item" onclick="selectStation('${inputEl.id}', '${s.name} (${s.code})', '${dropdownEl.id}')">
+            <div>
+              <strong>${s.name}</strong> <span style="color:#94a3b8; font-size:0.75rem;">(${s.code})</span>
+              <div style="font-size:0.7rem; color:#64748b;">${s.zone} Zone • ${s.division} Div</div>
+            </div>
+            <span class="badge-tag" style="color:#38bdf8;">Select</span>
+          </div>
+        `).join("");
+      }
+      dropdownEl.classList.remove("hidden");
+    } catch (e) {
+      console.warn("Station autocomplete fetch error:", e);
+    }
+  }
+
+  if (fromInput) {
+    fromInput.addEventListener("input", () => handleStationInput(fromInput, fromDropdown));
+  }
+  if (toInput) {
+    toInput.addEventListener("input", () => handleStationInput(toInput, toDropdown));
+  }
+
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".station-field-wrap")) {
+      if (fromDropdown) fromDropdown.classList.add("hidden");
+      if (toDropdown) toDropdown.classList.add("hidden");
+    }
+  });
+
+  renderRecentSearches();
+}
+
+function selectStation(inputId, formattedVal, dropdownId) {
+  const input = document.getElementById(inputId);
+  const dropdown = document.getElementById(dropdownId);
+  if (input) input.value = formattedVal;
+  if (dropdown) dropdown.classList.add("hidden");
+}
+
+function swapStations() {
+  const fromInput = document.getElementById("from-station-input");
+  const toInput = document.getElementById("to-station-input");
+  if (!fromInput || !toInput) return;
+
+  const temp = fromInput.value;
+  fromInput.value = toInput.value;
+  toInput.value = temp;
+
+  if (fromInput.value && toInput.value) {
+    searchTrainsByStations();
+  }
+}
+
+function setRouteAndSearch(fromCode, toCode) {
+  switchSearchMode('station');
+  const fromInput = document.getElementById("from-station-input");
+  const toInput = document.getElementById("to-station-input");
+  if (fromInput) fromInput.value = fromCode;
+  if (toInput) toInput.value = toCode;
+  searchTrainsByStations();
+}
+
+async function searchTrainsByStations() {
+  const fromVal = document.getElementById("from-station-input").value.trim();
+  const toVal = document.getElementById("to-station-input").value.trim();
+  const resultsBox = document.getElementById("station-search-results-box");
+  const resultsList = document.getElementById("station-search-results-list");
+  const resultsTitle = document.getElementById("search-results-title");
+
+  // Validation
+  if (!fromVal || !toVal) {
+    showToast("Please select both Origin (From) and Destination (To) stations.", "danger");
+    return;
+  }
+
+  if (fromVal.toLowerCase() === toVal.toLowerCase()) {
+    showToast("Origin and destination stations cannot be the same.", "danger");
+    return;
+  }
+
+  resultsBox.classList.remove("hidden");
+  resultsList.innerHTML = `<div class="card panel-card text-center" style="padding:1.5rem;"><p class="text-muted"><i class="fa-solid fa-spinner fa-spin text-cyan"></i> Searching available direct trains between ${fromVal} and ${toVal}...</p></div>`;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/trains/search?from_station=${encodeURIComponent(fromVal)}&to_station=${encodeURIComponent(toVal)}`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      resultsList.innerHTML = `
+        <div class="card panel-card text-center" style="padding:1.5rem;">
+          <p style="color:#fb7185;"><i class="fa-solid fa-circle-exclamation"></i> ${data.detail || "Error searching trains"}</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Save recent search
+    saveRecentSearch(fromVal, toVal);
+
+    if (data.count === 0 || !data.trains || data.trains.length === 0) {
+      resultsTitle.innerHTML = `<i class="fa-solid fa-ban text-amber"></i> Direct Trains (${fromVal} → ${toVal})`;
+      resultsList.innerHTML = `
+        <div class="card panel-card text-center" style="padding:2rem;">
+          <h4 style="color:#f59e0b; margin-bottom:0.5rem;"><i class="fa-solid fa-triangle-exclamation"></i> No Direct Trains Found</h4>
+          <p class="text-muted">No scheduled train operates directly from ${data.from_station.name} (${data.from_station.code}) to ${data.to_station.name} (${data.to_station.code}) in this route sequence.</p>
+        </div>
+      `;
+      return;
+    }
+
+    resultsTitle.innerHTML = `<i class="fa-solid fa-train-subway text-cyan"></i> Direct Trains: ${data.from_station.name} (${data.from_station.code}) → ${data.to_station.name} (${data.to_station.code}) <span class="badge-tag" style="color:#38bdf8; margin-left:0.5rem;">${data.count} Train(s) Found</span>`;
+
+    resultsList.innerHTML = data.trains.map(t => {
+      const isDelayed = t.current_delay_min > 0;
+      return `
+        <div class="station-result-card">
+          <div class="result-card-main">
+            <div class="result-train-header">
+              <span class="result-train-num">${t.train_number}</span>
+              <span class="result-train-name">${t.train_name}</span>
+              <span class="badge-tag" style="color:#38bdf8;">${t.train_type}</span>
+            </div>
+
+            <div class="result-timing-row">
+              <div class="timing-block">
+                <div class="time-lbl">DEPARTURE (${t.origin_station.code})</div>
+                <div class="time-val">${t.origin_station.departure}</div>
+                <div style="font-size:0.7rem; color:#94a3b8;">${t.origin_station.name} (PF ${t.origin_station.platform})</div>
+              </div>
+
+              <div style="font-size:1.2rem; color:#64748b;"><i class="fa-solid fa-arrow-right"></i></div>
+
+              <div class="timing-block">
+                <div class="time-lbl">SCH. ARRIVAL (${t.destination_station.code})</div>
+                <div class="time-val">${t.destination_station.scheduled_arrival}</div>
+                <div style="font-size:0.7rem; color:#94a3b8;">${t.destination_station.name} (PF ${t.destination_station.platform})</div>
+              </div>
+
+              <div class="result-dynamic-box">
+                <div>
+                  <div class="time-lbl">DYNAMIC PREDICTED ETA</div>
+                  <div class="time-val text-cyan">${t.destination_station.dynamic_eta}</div>
+                </div>
+                <div>
+                  <div class="time-lbl">CURRENT DELAY</div>
+                  <span class="delay-pill ${isDelayed ? 'delayed' : 'ontime'}">
+                    ${isDelayed ? `+${t.current_delay_min} min` : 'On Time'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div style="font-size:0.75rem; color:#64748b; margin-top:0.4rem;">
+              <i class="fa-solid fa-road"></i> Inter-station Distance: ${t.distance_km} km • Status: <strong style="color:${t.live_status === 'RUNNING' ? '#10b981' : '#f59e0b'}">${t.live_status}</strong>
+            </div>
+          </div>
+
+          <div>
+            <button class="btn btn-primary" onclick="trackTrain('${t.train_number}')">
+              <i class="fa-solid fa-bolt"></i> TRACK TRAIN
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+  } catch (err) {
+    console.error("Route search error:", err);
+    resultsList.innerHTML = `<div class="card panel-card text-center" style="padding:1.5rem;"><p class="text-danger">Network error connecting to search service.</p></div>`;
+  }
+}
+
+function closeSearchResults() {
+  const box = document.getElementById("station-search-results-box");
+  if (box) box.classList.add("hidden");
+}
+
+function saveRecentSearch(fromSt, toSt) {
+  try {
+    let recent = JSON.parse(localStorage.getItem("rn_recent_searches") || "[]");
+    recent = recent.filter(r => !(r.from === fromSt && r.to === toSt));
+    recent.unshift({ from: fromSt, to: toSt, timestamp: new Date().toISOString() });
+    recent = recent.slice(0, 4); // Keep top 4
+    localStorage.setItem("rn_recent_searches", JSON.stringify(recent));
+    renderRecentSearches();
+  } catch (e) {
+    console.warn("Error saving recent search:", e);
+  }
+}
+
+function renderRecentSearches() {
+  const container = document.getElementById("recent-searches-list");
+  const wrap = document.getElementById("recent-searches-wrap");
+  if (!container || !wrap) return;
+
+  try {
+    const recent = JSON.parse(localStorage.getItem("rn_recent_searches") || "[]");
+    if (!recent || recent.length === 0) {
+      wrap.classList.add("hidden");
+      return;
+    }
+
+    wrap.classList.remove("hidden");
+    container.innerHTML = recent.map(r => `
+      <span class="route-pill" onclick="setRouteAndSearch('${r.from}', '${r.to}')">
+        ${r.from} → ${r.to}
+      </span>
+    `).join("");
+  } catch (e) {
+    wrap.classList.add("hidden");
+  }
+}
+
+// ----------------- TRAIN NUMBER SEARCH & AUTOCOMPLETE -----------------
 function setupSearchDropdown() {
   const input = document.getElementById("train-search-input");
   const dropdown = document.getElementById("search-results-dropdown");
+  if (!input || !dropdown) return;
 
   input.addEventListener("input", () => {
     const q = input.value.trim().toLowerCase();

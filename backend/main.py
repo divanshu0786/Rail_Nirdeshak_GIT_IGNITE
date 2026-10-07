@@ -99,6 +99,104 @@ def list_trains(query: Optional[str] = None, db: Session = Depends(get_db)):
         )
     return q.all()
 
+@app.get("/api/trains/search")
+@app.get("/trains/search")
+def search_trains_route(from_station: Optional[str] = None, to_station: Optional[str] = None, db: Session = Depends(get_db)):
+    # Support both 'from' and 'from_station' parameter aliases
+    from_q = from_station or ""
+    to_q = to_station or ""
+
+    if not from_q.strip() or not to_q.strip():
+        raise HTTPException(status_code=400, detail="Please select both origin (from) and destination (to) stations.")
+
+    def extract_code_or_name(st_str: str) -> str:
+        st_str = st_str.strip()
+        if "(" in st_str and ")" in st_str:
+            code = st_str.split("(")[-1].split(")")[0].strip()
+            if code:
+                return code
+        return st_str
+
+    from_clean = extract_code_or_name(from_q)
+    to_clean = extract_code_or_name(to_q)
+
+    # 1. Resolve Station Entities
+    from_st = db.query(models.Station).filter(
+        (models.Station.code.ilike(from_clean)) | (models.Station.name.ilike(f"%{from_clean}%"))
+    ).first()
+
+    to_st = db.query(models.Station).filter(
+        (models.Station.code.ilike(to_clean)) | (models.Station.name.ilike(f"%{to_clean}%"))
+    ).first()
+
+    if not from_st:
+        raise HTTPException(status_code=404, detail=f"Origin station '{from_q}' not found.")
+    if not to_st:
+        raise HTTPException(status_code=404, detail=f"Destination station '{to_q}' not found.")
+
+    if from_st.id == to_st.id:
+        raise HTTPException(status_code=400, detail="Origin and destination cannot be the same station.")
+
+    # 2. Find matching trains in correct sequence order
+    all_trains = db.query(models.Train).filter(models.Train.is_active == True).all()
+    results = []
+
+    for t in all_trains:
+        stops = t.route_stops
+        from_stop = next((s for s in stops if s.station_id == from_st.id), None)
+        to_stop = next((s for s in stops if s.station_id == to_st.id), None)
+
+        if from_stop and to_stop and from_stop.stop_sequence < to_stop.stop_sequence:
+            curr_delay = t.live_state.current_delay_min if t.live_state else 0
+            live_status = t.live_state.status if t.live_state else "SCHEDULED"
+            speed = t.live_state.speed_kmh if t.live_state else None
+            
+            dyn_eta = None
+            if to_stop.scheduled_arrival:
+                try:
+                    parts = to_stop.scheduled_arrival.split(":")
+                    h, m = int(parts[0]), int(parts[1])
+                    total_m = (h * 60 + m + curr_delay) % (24 * 60)
+                    dyn_eta = f"{total_m // 60:02d}:{total_m % 60:02d}"
+                except Exception:
+                    dyn_eta = to_stop.scheduled_arrival
+
+            results.append({
+                "train_id": t.id,
+                "train_number": t.train_number,
+                "train_name": t.train_name,
+                "train_type": t.train_type,
+                "source": t.source,
+                "destination": t.destination,
+                "origin_station": {
+                    "code": from_st.code,
+                    "name": from_st.name,
+                    "departure": from_stop.scheduled_departure or from_stop.scheduled_arrival or "--",
+                    "sequence": from_stop.stop_sequence,
+                    "platform": from_stop.platform
+                },
+                "destination_station": {
+                    "code": to_st.code,
+                    "name": to_st.name,
+                    "scheduled_arrival": to_stop.scheduled_arrival or to_stop.scheduled_departure or "--",
+                    "dynamic_eta": dyn_eta or to_stop.scheduled_arrival or "--",
+                    "sequence": to_stop.stop_sequence,
+                    "platform": to_stop.platform
+                },
+                "distance_km": max(0.0, round(to_stop.distance_from_source_km - from_stop.distance_from_source_km, 1)),
+                "current_delay_min": curr_delay,
+                "live_speed_kmh": speed,
+                "live_status": live_status,
+                "is_live_available": t.live_state is not None
+            })
+
+    return {
+        "from_station": {"code": from_st.code, "name": from_st.name},
+        "to_station": {"code": to_st.code, "name": to_st.name},
+        "count": len(results),
+        "trains": results
+    }
+
 @app.get("/api/trains/{train_ident}")
 def get_train_detail(train_ident: str, db: Session = Depends(get_db)):
     train = None

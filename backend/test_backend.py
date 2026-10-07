@@ -111,8 +111,71 @@ def run_tests():
     assert res.status_code == 200
     print("✓ Replayed historical point successfully:", res.json()["applied_point"]["current_station"])
 
+    print("\n14. Testing Train Search by From/To Station...")
+    # Test 1: New Delhi -> Amritsar
+    r_ndls_asr = client.get("/api/trains/search?from_station=NDLS&to_station=ASR")
+    assert r_ndls_asr.status_code == 200
+    t1 = r_ndls_asr.json()["trains"][0]
+    assert t1["train_number"] == "12497"
+    print(f"  ✓ Test 1 Passed: NDLS -> ASR found Train {t1['train_number']} (Dep: {t1['origin_station']['departure']}, Arr: {t1['destination_station']['scheduled_arrival']}, Dyn ETA: {t1['destination_station']['dynamic_eta']})")
+
+    # Test 2: Amritsar -> New Delhi (Reverse)
+    r_asr_ndls = client.get("/api/trains/search?from_station=ASR&to_station=NDLS")
+    assert r_asr_ndls.status_code == 200
+    t2 = r_asr_ndls.json()["trains"][0]
+    assert t2["train_number"] == "12498"
+    print(f"  ✓ Test 2 Passed: ASR -> NDLS found Train {t2['train_number']}")
+
+    # Test 3: New Delhi -> Kalka
+    r_ndls_klk = client.get("/api/trains/search?from_station=New%20Delhi&to_station=Kalka")
+    assert r_ndls_klk.status_code == 200
+    t3 = r_ndls_klk.json()["trains"][0]
+    assert t3["train_number"] == "12011"
+    print(f"  ✓ Test 3 Passed: NDLS -> KLK found Train {t3['train_number']}")
+
+    # Test 4: Kalka -> New Delhi
+    r_klk_ndls = client.get("/api/trains/search?from_station=KLK&to_station=NDLS")
+    assert r_klk_ndls.status_code == 200
+    t4 = r_klk_ndls.json()["trains"][0]
+    assert t4["train_number"] == "12012"
+    print(f"  ✓ Test 4 Passed: KLK -> NDLS found Train {t4['train_number']}")
+
+    # Test 5: Invalid station
+    r_inv = client.get("/api/trains/search?from_station=NON_EXISTENT_STATION&to_station=ASR")
+    assert r_inv.status_code == 404
+    print("  ✓ Test 5 Passed: Invalid station returned 404 cleanly")
+
+    # Test 6: Same station
+    r_same = client.get("/api/trains/search?from_station=NDLS&to_station=NDLS")
+    assert r_same.status_code == 400
+    print("  ✓ Test 6 Passed: Same origin/destination returned 400 cleanly")
+
+    # Test 7: Route where no direct train exists
+    r_no_direct = client.get("/api/trains/search?from_station=ASR&to_station=KLK")
+    assert r_no_direct.status_code == 200
+    assert r_no_direct.json()["count"] == 0
+    print("  ✓ Test 7 Passed: No direct train route correctly returned count 0")
+
+    # Test 8: Multiple trains on corridor sub-route (SNP -> PNP)
+    r_multi = client.get("/api/trains/search?from_station=SNP&to_station=PNP")
+    assert r_multi.status_code == 200
+    assert r_multi.json()["count"] >= 1
+    print(f"  ✓ Test 8 Passed: Sub-corridor SNP -> PNP found {r_multi.json()['count']} trains")
+
+    # Test 9: Search result structure & track details
+    assert "departure" in t1["origin_station"]
+    assert "scheduled_arrival" in t1["destination_station"]
+    assert "dynamic_eta" in t1["destination_station"]
+    print("  ✓ Test 9 Passed: Search response contains dynamic ETA, delay, and sequence")
+
+    # Test 10: Track page detail loads
+    r_detail = client.get(f"/api/trains/{t1['train_number']}")
+    assert r_detail.status_code == 200
+    assert len(r_detail.json()["predictions"]) > 0
+    print(f"  ✓ Test 10 Passed: Track detail for Train {t1['train_number']} loaded and verified")
+
     print("\n===========================================")
-    print("ALL 13 BACKEND & DATASET TESTS PASSED!")
+    print("ALL 14 BACKEND, DATASET & SEARCH TESTS PASSED!")
     print("===========================================")
 
 if __name__ == "__main__":

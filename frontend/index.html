@@ -70,16 +70,88 @@
           Unlike static timetables or ordinary delay trackers, Rail Nirdeshak calculates evolving section delays, track headway risks, and physical survey observations in real time.
         </p>
 
-        <!-- Search Bar -->
-        <div class="search-box-card">
-          <div class="search-input-group">
-            <i class="fa-solid fa-magnifying-glass search-icon"></i>
-            <input type="text" id="train-search-input" placeholder="Enter Train Number or Name (e.g. 12497, Shane Punjab)..." autocomplete="off" onkeyup="handleSearchKey(event)">
-            <button class="btn btn-primary" onclick="searchTrains()">
-              <i class="fa-solid fa-bolt"></i> Track Dynamic ETA
+        <!-- Dual Search Panel: Route Search (From/To) & Train No. Search -->
+        <div class="search-panel-container">
+          <div class="search-mode-tabs">
+            <button class="search-tab-btn active" id="tab-btn-station-search" onclick="switchSearchMode('station')">
+              <i class="fa-solid fa-arrows-split-up-and-left"></i> Search by Station (From → To)
+            </button>
+            <button class="search-tab-btn" id="tab-btn-train-search" onclick="switchSearchMode('train')">
+              <i class="fa-solid fa-train"></i> Search by Train Number / Name
             </button>
           </div>
-          <div id="search-results-dropdown" class="search-dropdown hidden"></div>
+
+          <!-- Mode 1: From / To Station Search Form -->
+          <div id="station-search-form" class="search-box-card route-search-card">
+            <div class="route-inputs-row">
+              <!-- From Station -->
+              <div class="station-field-wrap">
+                <label class="field-label"><i class="fa-solid fa-location-dot text-cyan"></i> FROM STATION</label>
+                <div class="input-with-icon">
+                  <input type="text" id="from-station-input" placeholder="Search origin station (e.g. Delhi, NDLS)..." autocomplete="off">
+                  <div id="from-station-dropdown" class="search-dropdown hidden"></div>
+                </div>
+              </div>
+
+              <!-- Swap Button -->
+              <button type="button" class="station-swap-btn" onclick="swapStations()" title="Swap origin and destination stations">
+                <i class="fa-solid fa-right-left"></i>
+              </button>
+
+              <!-- To Station -->
+              <div class="station-field-wrap">
+                <label class="field-label"><i class="fa-solid fa-flag-checkered text-amber"></i> TO STATION</label>
+                <div class="input-with-icon">
+                  <input type="text" id="to-station-input" placeholder="Search destination (e.g. Amritsar, ASR)..." autocomplete="off">
+                  <div id="to-station-dropdown" class="search-dropdown hidden"></div>
+                </div>
+              </div>
+
+              <!-- Search Button -->
+              <div class="search-action-wrap">
+                <button class="btn btn-primary btn-search-wide" onclick="searchTrainsByStations()">
+                  <i class="fa-solid fa-magnifying-glass"></i> SEARCH TRAINS
+                </button>
+              </div>
+            </div>
+
+            <!-- Popular & Recent Route Shortcuts -->
+            <div class="route-shortcuts-row">
+              <div class="shortcut-group">
+                <span class="shortcut-title"><i class="fa-solid fa-fire text-amber"></i> Popular Routes:</span>
+                <span class="route-pill" onclick="setRouteAndSearch('NDLS', 'ASR')">NDLS → ASR</span>
+                <span class="route-pill" onclick="setRouteAndSearch('ASR', 'NDLS')">ASR → NDLS</span>
+                <span class="route-pill" onclick="setRouteAndSearch('NDLS', 'KLK')">NDLS → KLK</span>
+                <span class="route-pill" onclick="setRouteAndSearch('KLK', 'NDLS')">KLK → NDLS</span>
+                <span class="route-pill" onclick="setRouteAndSearch('BTI', 'SSA')">BTI → SSA</span>
+              </div>
+              <div class="shortcut-group hidden" id="recent-searches-wrap">
+                <span class="shortcut-title"><i class="fa-solid fa-clock-rotate-left text-cyan"></i> Recent:</span>
+                <div id="recent-searches-list" class="recent-pills-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mode 2: Quick Train Number / Name Search Form -->
+          <div id="train-num-search-form" class="search-box-card hidden">
+            <div class="search-input-group">
+              <i class="fa-solid fa-magnifying-glass search-icon"></i>
+              <input type="text" id="train-search-input" placeholder="Enter Train Number or Name (e.g. 12497, Shane Punjab)..." autocomplete="off" onkeyup="handleSearchKey(event)">
+              <button class="btn btn-primary" onclick="searchTrains()">
+                <i class="fa-solid fa-bolt"></i> Track Dynamic ETA
+              </button>
+            </div>
+            <div id="search-results-dropdown" class="search-dropdown hidden"></div>
+          </div>
+
+          <!-- Station Search Results Section -->
+          <div id="station-search-results-box" class="search-results-section hidden">
+            <div class="results-header">
+              <h3 id="search-results-title"><i class="fa-solid fa-train-subway text-cyan"></i> Available Trains</h3>
+              <button class="btn btn-sm btn-outline" onclick="closeSearchResults()"><i class="fa-solid fa-xmark"></i> Close</button>
+            </div>
+            <div id="station-search-results-list" class="station-results-grid"></div>
+          </div>
         </div>
       </div>
 
