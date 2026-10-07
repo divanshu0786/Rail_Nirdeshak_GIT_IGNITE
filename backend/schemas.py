@@ -4,13 +4,13 @@ from pydantic import BaseModel, EmailStr
 
 # Auth Schemas
 class UserRegister(BaseModel):
-    email: EmailStr
+    email: str
     full_name: str
     password: str
     role: Optional[str] = "passenger"
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 class UserOut(BaseModel):
