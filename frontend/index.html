@@ -215,30 +215,6 @@
           </div>
         </div>
 
-        <!-- Interactive Telemetry Simulation Controls (For Judging / Live Testing) -->
-        <div class="simulator-strip">
-          <div class="sim-label">
-            <i class="fa-solid fa-database text-cyan"></i> <strong>6-Month Dataset & Telemetry Injector:</strong>
-          </div>
-          <div class="sim-actions">
-            <button class="btn btn-sm btn-action" onclick="replayNextHistoricalPoint()" title="Replay real recorded run from 6-month log dataset">
-              <i class="fa-solid fa-play"></i> Replay 6-Month Log Point
-            </button>
-            <button class="btn btn-sm btn-action" onclick="triggerSimulateStep(2, 60)">
-              <i class="fa-solid fa-clock"></i> +2m Step
-            </button>
-            <button class="btn btn-sm btn-action" onclick="triggerSimulateStep(-3, 95)">
-              <i class="fa-solid fa-forward-step"></i> Speed Recovery (-3m)
-            </button>
-            <button class="btn btn-sm btn-danger" onclick="triggerSimulateStep(8, 30)">
-              <i class="fa-solid fa-traffic-light"></i> Signal Halt (+8m)
-            </button>
-            <button class="btn btn-sm btn-secondary" onclick="refreshCurrentTrain()">
-              <i class="fa-solid fa-rotate"></i> Recalculate
-            </button>
-          </div>
-        </div>
-
         <!-- Main Tracking Two-Column Layout -->
         <div class="tracking-grid mt-4">
           
