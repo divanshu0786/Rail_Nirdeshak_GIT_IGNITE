@@ -909,14 +909,22 @@ function initOrUpdateMap() {
       maxZoom: 20
     });
 
-    const googleKey = (state.config && state.config.google_maps_api_key) ? state.config.google_maps_api_key : '';
-    const googleHybrid = L.tileLayer(`https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}${googleKey ? '&key=' + googleKey : ''}`, {
-      attribution: '&copy; Google Maps',
+    const maptilerKey = (state.config && (state.config.maptiler_api_key || state.config.map_api_key)) 
+      ? (state.config.maptiler_api_key || state.config.map_api_key) 
+      : 'p9vc6beu2V8LQJ818lck';
+
+    const maptilerHybrid = L.tileLayer(`https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.jpg?key=${maptilerKey}`, {
+      attribution: '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; OpenStreetMap',
       maxZoom: 20
     });
 
-    const googleRoads = L.tileLayer(`https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}${googleKey ? '&key=' + googleKey : ''}`, {
-      attribution: '&copy; Google Maps',
+    const maptilerOutdoor = L.tileLayer(`https://api.maptiler.com/maps/outdoor-v2/{z}/{x}/{y}.png?key=${maptilerKey}`, {
+      attribution: '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; OpenStreetMap',
+      maxZoom: 20
+    });
+
+    const maptilerStreets = L.tileLayer(`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${maptilerKey}`, {
+      attribution: '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; OpenStreetMap',
       maxZoom: 20
     });
 
@@ -925,13 +933,14 @@ function initOrUpdateMap() {
       maxZoom: 19
     });
 
-    // Default layer: Tactical Dark
-    darkLayer.addTo(state.map);
+    // Default layer: Satellite Hybrid or Tactical Dark
+    maptilerHybrid.addTo(state.map);
 
     const baseMaps = {
+      "🛰️ Satellite Hybrid": maptilerHybrid,
+      "🚂 Railway & Topo (Outdoors)": maptilerOutdoor,
+      "🗺️ MapTiler Streets": maptilerStreets,
       "🌙 Tactical Dark": darkLayer,
-      "🛰️ Google Satellite Hybrid": googleHybrid,
-      "🗺️ Google Roads": googleRoads,
       "🌐 OpenStreetMap": osmStandard
     };
 

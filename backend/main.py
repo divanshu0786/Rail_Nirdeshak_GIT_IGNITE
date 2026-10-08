@@ -48,6 +48,8 @@ def health_check():
 def get_app_config():
     return {
         "google_maps_api_key": os.getenv("GOOGLE_MAPS_API_KEY", ""),
+        "maptiler_api_key": os.getenv("MAPTILER_API_KEY", os.getenv("MAP_API_KEY", "")),
+        "map_api_key": os.getenv("MAP_API_KEY", os.getenv("MAPTILER_API_KEY", "")),
         "has_weather_api": bool(os.getenv("OPENWEATHERMAP_API_KEY"))
     }
 
