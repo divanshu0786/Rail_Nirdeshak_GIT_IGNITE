@@ -625,7 +625,14 @@ function renderTrackView(t) {
     // Side card metrics
     document.getElementById("track-section-val").textContent = t.live_state.track_section;
     document.getElementById("pole-ref-val").textContent = t.live_state.reference_pole || "KM 42/18";
-    document.getElementById("weather-val").innerHTML = `<i class="fa-solid fa-sun text-amber"></i> ${t.live_state.weather_condition}`;
+    if (t.live_state.weather_info) {
+      const w = t.live_state.weather_info;
+      const icon = w.condition === 'RAIN' ? 'fa-cloud-showers-heavy text-cyan' : (w.condition === 'FOG' ? 'fa-smog text-muted' : (w.condition === 'CLOUDS' ? 'fa-cloud text-steel' : 'fa-sun text-amber'));
+      document.getElementById("weather-val").innerHTML = `<i class="fa-solid ${icon}"></i> ${w.description} (${w.temp_c}°C)`;
+      document.getElementById("weather-val").title = `OpenWeatherMap Live: ${w.temp_c}°C, Humidity ${w.humidity}%, Visibility ${w.visibility_meters}m | ${w.caution_note}`;
+    } else {
+      document.getElementById("weather-val").innerHTML = `<i class="fa-solid fa-sun text-amber"></i> ${t.live_state.weather_condition}`;
+    }
     document.getElementById("gps-val").textContent = `${t.live_state.latitude.toFixed(4)} N, ${t.live_state.longitude.toFixed(4)} E`;
     document.getElementById("remaining-dist-val").textContent = `${t.live_state.remaining_distance_km} km`;
   }
@@ -773,14 +780,15 @@ function renderFullRouteTable(stops) {
 async function loadCorridorObservations(section) {
   const container = document.getElementById("corridor-obs-list");
   try {
-    const res = await fetch(`${API_BASE}/api/field-observations`);
+    const res = await fetch(`${API_BASE}/api/field-observations?limit=10`);
     if (res.ok) {
       const obs = await res.json();
       if (!obs || obs.length === 0) {
         container.innerHTML = "<p class='text-muted'>No active survey warnings on this corridor.</p>";
         return;
       }
-      container.innerHTML = obs.map(o => `
+      const top10 = obs.slice(0, 10);
+      container.innerHTML = top10.map(o => `
         <div class="field-obs-item">
           <div class="obs-top">
             <span class="obs-type-tag">${o.observation_type}</span>

@@ -20,6 +20,7 @@ from auth import (
 )
 from eta_engine import calculate_dynamic_eta
 from websocket_manager import manager
+import weather_service
 
 # Create tables on startup if not existing
 Base.metadata.create_all(bind=engine)
@@ -264,6 +265,11 @@ def get_train_detail(train_ident: str, db: Session = Depends(get_db)):
     if train.live_state:
         curr_st = db.query(models.Station).filter(models.Station.id == train.live_state.current_station_id).first()
         next_st = db.query(models.Station).filter(models.Station.id == train.live_state.next_station_id).first()
+        weather_info = weather_service.get_live_weather(
+            train.live_state.latitude,
+            train.live_state.longitude,
+            location_name=curr_st.name if curr_st else train.source
+        )
         live_data = {
             "id": train.live_state.id,
             "train_id": train.live_state.train_id,
@@ -276,6 +282,7 @@ def get_train_detail(train_ident: str, db: Session = Depends(get_db)):
             "track_section": train.live_state.track_section,
             "reference_pole": train.live_state.reference_pole,
             "weather_condition": train.live_state.weather_condition,
+            "weather_info": weather_info,
             "last_updated": train.live_state.last_updated.isoformat(),
             "current_station": {"code": curr_st.code, "name": curr_st.name} if curr_st else None,
             "next_station": {"code": next_st.code, "name": next_st.name} if next_st else None,
@@ -490,8 +497,8 @@ def remove_saved_train(train_id: int, user: models.User = Depends(require_curren
 
 # ----------------- FIELD OBSERVATIONS -----------------
 @app.get("/api/field-observations", response_model=List[schemas.FieldObservationOut])
-def get_field_observations(db: Session = Depends(get_db)):
-    return db.query(models.FieldObservation).order_by(models.FieldObservation.reported_at.desc()).all()
+def get_field_observations(limit: int = 10, db: Session = Depends(get_db)):
+    return db.query(models.FieldObservation).order_by(models.FieldObservation.reported_at.desc()).limit(limit).all()
 
 @app.post("/api/field-observations", response_model=schemas.FieldObservationOut)
 def create_field_observation(obs_in: schemas.FieldObservationCreate, db: Session = Depends(get_db)):
@@ -508,6 +515,11 @@ def create_field_observation(obs_in: schemas.FieldObservationCreate, db: Session
     db.commit()
     db.refresh(obs)
     return obs
+
+# ----------------- LIVE WEATHER API -----------------
+@app.get("/api/weather")
+def get_weather_data(lat: float = 28.6427, lon: float = 77.2195, location: Optional[str] = None):
+    return weather_service.get_live_weather(lat, lon, location)
 
 # ----------------- CONTROL ROOM OVERVIEW -----------------
 @app.get("/api/control-room/overview")

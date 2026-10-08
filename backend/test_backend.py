@@ -174,8 +174,17 @@ def run_tests():
     assert len(r_detail.json()["predictions"]) > 0
     print(f"  ✓ Test 10 Passed: Track detail for Train {t1['train_number']} loaded and verified")
 
+    print("\n15. Testing OpenWeatherMap Live Weather Integration...")
+    r_weather = client.get("/api/weather?lat=28.6427&lon=77.2195")
+    assert r_weather.status_code == 200
+    w_data = r_weather.json()
+    assert "condition" in w_data
+    assert "temp_c" in w_data
+    assert "visibility_meters" in w_data
+    print(f"✓ OpenWeatherMap Live Weather OK: {w_data.get('city_name')} | Condition: {w_data['condition']} ({w_data['description']}) | Temp: {w_data['temp_c']}°C | Visibility: {w_data['visibility_meters']}m | Railway Delay Impact: +{w_data['railway_delay_impact_min']}m")
+
     print("\n===========================================")
-    print("ALL 14 BACKEND, DATASET & SEARCH TESTS PASSED!")
+    print("ALL 15 BACKEND, DATASET & WEATHER TESTS PASSED!")
     print("===========================================")
 
 if __name__ == "__main__":

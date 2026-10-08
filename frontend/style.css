@@ -932,34 +932,6 @@ body {
   margin-top: 0.1rem;
 }
 
-/* Simulator Strip */
-.simulator-strip {
-  background: #FFFDF8;
-  border: 1px solid #F1DEC0;
-  border-radius: var(--radius);
-  padding: 0.65rem 1rem;
-  margin-top: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.sim-label {
-  font-size: 0.85rem;
-  color: #8C5B00;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.sim-actions {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
-
 /* Propagation Warning Banner */
 .alert-banner {
   background: var(--critical-bg);

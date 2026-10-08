@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from models import Train, RouteStop, Station, LiveTrainState, FieldObservation, ETAPrediction
+import weather_service
 
 def parse_hhmm(time_str: str, base_date: Optional[datetime] = None) -> datetime:
     if not base_date:
@@ -22,14 +23,19 @@ def calculate_dynamic_eta(
     """
     Dynamic ETA & Delay Prediction Engine:
     ETA = Current Time + Base Travel Time + Signal Delay + Congestion Delay + Weather Delay - Recovery Margin
-    Incorporates physical field observations and shared-track propagation risk.
+    Incorporates physical field observations, real-time live weather API, and shared-track propagation risk.
     """
     # 1. Get all route stops ordered by sequence
     stops = db.query(RouteStop).filter(RouteStop.train_id == train.id).order_by(RouteStop.stop_sequence).all()
     if not stops:
         return []
 
-    # 2. Find upcoming stops
+    # 2. Fetch live weather metrics for the train's current latitude/longitude
+    live_weather = weather_service.get_live_weather(live_state.latitude, live_state.longitude)
+    if live_weather and live_weather.get("condition"):
+        live_state.weather_condition = live_weather["condition"]
+
+    # 3. Find upcoming stops
     # If next_station is specified, find stops starting from next_station
     upcoming_stops: List[RouteStop] = []
     found_next = False
@@ -46,7 +52,7 @@ def calculate_dynamic_eta(
     else:
         upcoming_stops = upcoming_stops[:max_upcoming_stations]
 
-    # 3. Check for active field observations along track section
+    # 4. Check for active field observations along track section
     active_obs = db.query(FieldObservation).filter(
         (FieldObservation.track_section == live_state.track_section) |
         (FieldObservation.station_id.in_([s.station_id for s in upcoming_stops]))
@@ -54,7 +60,7 @@ def calculate_dynamic_eta(
     
     field_obs_delay = sum(obs.impact_delay_min for obs in active_obs)
 
-    # 4. Check shared-track propagation risk with preceding/following trains
+    # 5. Check shared-track propagation risk with preceding/following trains
     other_trains_on_section = db.query(LiveTrainState).filter(
         LiveTrainState.track_section == live_state.track_section,
         LiveTrainState.train_id != train.id
@@ -65,7 +71,7 @@ def calculate_dynamic_eta(
         "MODERATE" if (live_state.current_delay_min >= 8 or len(active_obs) > 0) else "LOW"
     )
 
-    # 5. Clear old predictions for this train
+    # 6. Clear old predictions for this train
     db.query(ETAPrediction).filter(ETAPrediction.train_id == train.id).delete()
 
     predictions = []
@@ -88,8 +94,10 @@ def calculate_dynamic_eta(
         speed_deficit = max(0.0, 90.0 - live_state.speed_kmh)
         congestion_delay = int(round(min(12, (speed_deficit / 10.0) + (4 if shared_track_delayed else 1))))
         
-        # Weather impact
-        weather_delay = 4 if live_state.weather_condition == "FOG" else (2 if live_state.weather_condition == "RAIN" else 0)
+        # Live Weather impact from OpenWeatherMap
+        weather_delay = live_weather.get("railway_delay_impact_min", 0) if live_weather else (
+            4 if live_state.weather_condition == "FOG" else (2 if live_state.weather_condition == "RAIN" else 0)
+        )
         
         # Recovery Buffer (Express trains have scheduled padding to recover delay over distance)
         recovery_margin = min(cumulative_delay, int(round(1.5 * (idx + 1))))
