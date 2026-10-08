@@ -44,6 +44,13 @@ app.add_middleware(
 def health_check():
     return {"status": "ok", "service": "Rail Nirdeshak Backend", "timestamp": datetime.utcnow().isoformat()}
 
+@app.get("/api/config")
+def get_app_config():
+    return {
+        "google_maps_api_key": os.getenv("GOOGLE_MAPS_API_KEY", ""),
+        "has_weather_api": bool(os.getenv("OPENWEATHERMAP_API_KEY"))
+    }
+
 # ----------------- AUTHENTICATION -----------------
 @app.post("/auth/register", response_model=schemas.TokenOut)
 def register(user_in: schemas.UserRegister, db: Session = Depends(get_db)):

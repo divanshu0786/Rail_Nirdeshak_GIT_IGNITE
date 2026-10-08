@@ -13,6 +13,7 @@ let state = {
   savedTrains: [],
   controlData: null,
   ws: null,
+  config: null,
   map: null,
   mapLayers: {
     polyline: null,
@@ -23,12 +24,24 @@ let state = {
 
 // Document Init
 document.addEventListener("DOMContentLoaded", () => {
+  loadAppConfig();
   initAuth();
   loadInitialTrains();
   loadControlRoom();
   setupSearchDropdown();
   setupStationAutocomplete();
 });
+
+async function loadAppConfig() {
+  try {
+    const res = await fetch(`${API_BASE}/api/config`);
+    if (res.ok) {
+      state.config = await res.json();
+    }
+  } catch (e) {
+    console.debug("Config load note:", e);
+  }
+}
 
 // ----------------- TAB NAVIGATION -----------------
 function switchTab(tabId) {
@@ -889,11 +902,40 @@ function initOrUpdateMap() {
 
   if (!state.map) {
     state.map = L.map('live-leaflet-map').setView([29.5, 76.5], 7);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+
+    const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OpenStreetMap &copy; CARTO',
       subdomains: 'abcd',
+      maxZoom: 20
+    });
+
+    const googleKey = (state.config && state.config.google_maps_api_key) ? state.config.google_maps_api_key : '';
+    const googleHybrid = L.tileLayer(`https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}${googleKey ? '&key=' + googleKey : ''}`, {
+      attribution: '&copy; Google Maps',
+      maxZoom: 20
+    });
+
+    const googleRoads = L.tileLayer(`https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}${googleKey ? '&key=' + googleKey : ''}`, {
+      attribution: '&copy; Google Maps',
+      maxZoom: 20
+    });
+
+    const osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 19
-    }).addTo(state.map);
+    });
+
+    // Default layer: Tactical Dark
+    darkLayer.addTo(state.map);
+
+    const baseMaps = {
+      "🌙 Tactical Dark": darkLayer,
+      "🛰️ Google Satellite Hybrid": googleHybrid,
+      "🗺️ Google Roads": googleRoads,
+      "🌐 OpenStreetMap": osmStandard
+    };
+
+    L.control.layers(baseMaps, null, { position: 'topright' }).addTo(state.map);
   }
 
   // Clear previous layers
