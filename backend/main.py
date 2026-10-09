@@ -637,4 +637,12 @@ frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "fr
 if os.path.exists(frontend_dir):
     app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
 
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    host = os.environ.get("HOST", "0.0.0.0")
+    print(f"[Rail Nirdeshak] Launching on {host}:{port}")
+    uvicorn.run(app, host=host, port=port)
+
+
 
