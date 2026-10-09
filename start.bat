@@ -1,4 +1,12 @@
 @echo off
-echo Starting Rail Nirdeshak...
-py -3 backend/seed_data.py
-py -3 -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
+echo Starting Rail Nirdeshak Server...
+
+if exist ".venv\Scripts\python.exe" (
+    ".venv\Scripts\python.exe" backend/main.py
+) else if exist "backend\.venv\Scripts\python.exe" (
+    "backend\.venv\Scripts\python.exe" backend/main.py
+) else (
+    py -3 backend/main.py
+)
+pause
+

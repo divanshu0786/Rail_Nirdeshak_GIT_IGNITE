@@ -940,6 +940,31 @@ function initOrUpdateMap() {
       zoomControl: true
     });
 
+    const maptilerKey = (state.config && (state.config.map_api_key || state.config.maptiler_api_key)) 
+      ? (state.config.map_api_key || state.config.maptiler_api_key) 
+      : 'p9vc6beu2V8LQJ818lck';
+
+    const maptilerHybrid = L.tileLayer(`https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.jpg?key=${maptilerKey}`, {
+      attribution: '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 20,
+      tileSize: 512,
+      zoomOffset: -1
+    });
+
+    const maptilerOutdoor = L.tileLayer(`https://api.maptiler.com/maps/outdoor-v2/{z}/{x}/{y}.png?key=${maptilerKey}`, {
+      attribution: '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 20,
+      tileSize: 512,
+      zoomOffset: -1
+    });
+
+    const maptilerStreets = L.tileLayer(`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${maptilerKey}`, {
+      attribution: '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 20,
+      tileSize: 512,
+      zoomOffset: -1
+    });
+
     const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap',
       subdomains: 'abcd',
@@ -951,33 +976,14 @@ function initOrUpdateMap() {
       maxZoom: 19
     });
 
-    const maptilerKey = (state.config && (state.config.maptiler_api_key || state.config.map_api_key)) 
-      ? (state.config.maptiler_api_key || state.config.map_api_key) 
-      : 'p9vc6beu2V8LQJ818lck';
-
-    const maptilerHybrid = L.tileLayer(`https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.jpg?key=${maptilerKey}`, {
-      attribution: '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; OpenStreetMap',
-      maxZoom: 20
-    });
-
-    const maptilerOutdoor = L.tileLayer(`https://api.maptiler.com/maps/outdoor-v2/{z}/{x}/{y}.png?key=${maptilerKey}`, {
-      attribution: '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; OpenStreetMap',
-      maxZoom: 20
-    });
-
-    const maptilerStreets = L.tileLayer(`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${maptilerKey}`, {
-      attribution: '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; OpenStreetMap',
-      maxZoom: 20
-    });
-
-    // Add high-contrast dark mode as default for clean railway visualization
-    darkLayer.addTo(state.map);
+    // Set MapTiler Satellite Hybrid as the active default map layer
+    maptilerHybrid.addTo(state.map);
 
     const baseMaps = {
-      "🌙 Tactical Dark": darkLayer,
-      "🛰️ Satellite Hybrid": maptilerHybrid,
-      "🚂 Railway & Topo (Outdoors)": maptilerOutdoor,
+      "🛰️ MapTiler Satellite Hybrid": maptilerHybrid,
+      "🚂 MapTiler Railways & Outdoors": maptilerOutdoor,
       "🗺️ MapTiler Streets": maptilerStreets,
+      "🌙 Tactical Dark": darkLayer,
       "🌐 OpenStreetMap": osmStandard
     };
 
