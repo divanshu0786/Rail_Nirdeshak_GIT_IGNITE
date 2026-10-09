@@ -8,7 +8,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocke
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
-from database import engine, Base, get_db
+from database import engine, Base, SessionLocal, get_db
 import models
 import schemas
 from auth import (
