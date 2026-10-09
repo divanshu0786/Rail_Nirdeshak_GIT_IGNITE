@@ -1266,6 +1266,50 @@ body {
 .legend-dot.blue { background: var(--navy); }
 .legend-dot.red { background: var(--critical); }
 
+/* Train Map Marker Pulsing Animation */
+.train-map-marker-pulse {
+  position: relative;
+  width: 24px;
+  height: 24px;
+}
+
+.train-map-marker-pulse .pulse-core {
+  width: 16px;
+  height: 16px;
+  background: #10b981;
+  border: 2.5px solid #ffffff;
+  border-radius: 50%;
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.9);
+  z-index: 2;
+}
+
+.train-map-marker-pulse .pulse-wave {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.45);
+  position: absolute;
+  top: 0;
+  left: 0;
+  animation: mapPulse 2s infinite ease-out;
+  z-index: 1;
+}
+
+@keyframes mapPulse {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+  font-family: var(--font-sans);
+}
+
+
 /* Control Room KPI Bar */
 .control-header-bar {
   display: flex;

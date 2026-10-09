@@ -77,7 +77,17 @@ function switchTab(tabId) {
   if (targetNav) targetNav.classList.add("active");
 
   if (tabId === "map") {
-    setTimeout(initOrUpdateMap, 200);
+    setTimeout(() => {
+      initOrUpdateMap();
+      if (state.map) {
+        state.map.invalidateSize(true);
+      }
+    }, 100);
+    setTimeout(() => {
+      if (state.map) {
+        state.map.invalidateSize(true);
+      }
+    }, 300);
   } else if (tabId === "saved") {
     loadSavedTrains();
   } else if (tabId === "control") {
@@ -924,12 +934,21 @@ function initOrUpdateMap() {
   if (!mapElement) return;
 
   if (!state.map) {
-    state.map = L.map('live-leaflet-map').setView([29.5, 76.5], 7);
+    state.map = L.map('live-leaflet-map', {
+      center: [29.5, 76.5],
+      zoom: 7,
+      zoomControl: true
+    });
 
     const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap',
       subdomains: 'abcd',
       maxZoom: 20
+    });
+
+    const osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+      maxZoom: 19
     });
 
     const maptilerKey = (state.config && (state.config.maptiler_api_key || state.config.map_api_key)) 
@@ -951,24 +970,27 @@ function initOrUpdateMap() {
       maxZoom: 20
     });
 
-    const osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
-      maxZoom: 19
-    });
-
-    // Default layer: Satellite Hybrid or Tactical Dark
-    maptilerHybrid.addTo(state.map);
+    // Add high-contrast dark mode as default for clean railway visualization
+    darkLayer.addTo(state.map);
 
     const baseMaps = {
+      "🌙 Tactical Dark": darkLayer,
       "🛰️ Satellite Hybrid": maptilerHybrid,
       "🚂 Railway & Topo (Outdoors)": maptilerOutdoor,
       "🗺️ MapTiler Streets": maptilerStreets,
-      "🌙 Tactical Dark": darkLayer,
       "🌐 OpenStreetMap": osmStandard
     };
 
     L.control.layers(baseMaps, null, { position: 'topright' }).addTo(state.map);
+
+    // Auto-invalidate map size whenever window resizes
+    window.addEventListener('resize', () => {
+      if (state.map) state.map.invalidateSize();
+    });
   }
+
+  // Ensure map is properly sized in case tab was previously hidden
+  state.map.invalidateSize();
 
   // Clear previous layers
   if (state.mapLayers.polyline) state.map.removeLayer(state.mapLayers.polyline);
@@ -976,7 +998,38 @@ function initOrUpdateMap() {
   state.mapLayers.stationMarkers.forEach(m => state.map.removeLayer(m));
   state.mapLayers.stationMarkers = [];
 
-  if (!state.currentTrain || !state.currentTrain.route_stops) return;
+  // Update map header subtitle
+  const sub = document.getElementById("map-status-sub");
+  if (state.currentTrain) {
+    if (sub) sub.textContent = `Tracking Train ${state.currentTrain.train_number} (${state.currentTrain.train_name}) • ${state.currentTrain.source} → ${state.currentTrain.destination}`;
+  }
+
+  if (!state.currentTrain || !state.currentTrain.route_stops || state.currentTrain.route_stops.length === 0) {
+    // If no train is selected yet, show all active trains across corridor
+    if (state.allTrains && state.allTrains.length > 0) {
+      state.allTrains.forEach(t => {
+        if (t.live_state) {
+          const lat = t.live_state.latitude;
+          const lng = t.live_state.longitude;
+          const marker = L.circleMarker([lat, lng], {
+            radius: 8,
+            fillColor: "#10b981",
+            color: "#ffffff",
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.9
+          }).bindPopup(`
+            <b>Train ${t.train_number} - ${t.train_name}</b><br>
+            Speed: ${t.live_state.speed_kmh} km/h | Delay: +${t.live_state.current_delay_min}m<br>
+            <button class="btn btn-primary btn-sm mt-2" onclick="trackTrain('${t.train_number}')">Track Train</button>
+          `);
+          marker.addTo(state.map);
+          state.mapLayers.stationMarkers.push(marker);
+        }
+      });
+    }
+    return;
+  }
 
   const latlngs = [];
   state.currentTrain.route_stops.forEach(s => {
@@ -984,46 +1037,62 @@ function initOrUpdateMap() {
     const lng = s.station.longitude;
     latlngs.push([lat, lng]);
 
-    // Station marker
+    // Station circle marker
     const marker = L.circleMarker([lat, lng], {
       radius: 6,
       fillColor: "#38bdf8",
       color: "#ffffff",
       weight: 2,
       opacity: 1,
-      fillOpacity: 0.9
-    }).bindPopup(`<b>${s.station.name} (${s.station.code})</b><br>Sch. Arr: ${s.scheduled_arrival || 'Source'}`);
+      fillOpacity: 0.95
+    }).bindPopup(`
+      <div style="font-family:inherit; min-width:140px;">
+        <strong style="color:#0f172a; font-size:0.95rem;">${s.station.name}</strong> 
+        <span style="color:#64748b; font-size:0.8rem;">(${s.station.code})</span><br>
+        <span style="color:#334155; font-size:0.8rem;">Seq #${s.stop_sequence} • PF ${s.platform}</span><br>
+        <div style="margin-top:4px; font-weight:600; color:#0284c7;">Sch. Arr: ${s.scheduled_arrival || 'Origin'}</div>
+      </div>
+    `);
     marker.addTo(state.map);
     state.mapLayers.stationMarkers.push(marker);
   });
 
   // Polyline for track route
   state.mapLayers.polyline = L.polyline(latlngs, {
-    color: '#2563eb',
+    color: '#0284c7',
     weight: 4,
-    opacity: 0.8,
+    opacity: 0.85,
     dashArray: '8, 6'
   }).addTo(state.map);
 
-  // Train live position marker
+  // Train live position marker with pulse
   if (state.currentTrain.live_state) {
     const tLat = state.currentTrain.live_state.latitude;
     const tLng = state.currentTrain.live_state.longitude;
     
     const trainIcon = L.divIcon({
-      className: 'train-map-marker',
-      html: `<div style="background:#10b981; border:2px solid #ffffff; width:16px; height:16px; border-radius:50%; box-shadow:0 0 10px #10b981;"></div>`,
-      iconSize: [16, 16],
-      iconAnchor: [8, 8]
+      className: 'train-map-marker-pulse',
+      html: `<div class="pulse-wave"></div><div class="pulse-core"></div>`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
     });
 
+    const isDelayed = state.currentTrain.live_state.current_delay_min > 0;
     state.mapLayers.trainMarker = L.marker([tLat, tLng], { icon: trainIcon })
-      .bindPopup(`<b>Train ${state.currentTrain.train_number}</b><br>Speed: ${state.currentTrain.live_state.speed_kmh} km/h<br>Delay: +${state.currentTrain.live_state.current_delay_min} min`)
+      .bindPopup(`
+        <div style="font-family:inherit; padding:4px; min-width:180px;">
+          <div style="font-weight:700; color:#0f172a; font-size:1rem;">Train ${state.currentTrain.train_number}</div>
+          <div style="color:#64748b; font-size:0.8rem; margin-bottom:6px;">${state.currentTrain.train_name}</div>
+          <div style="font-size:0.85rem; margin-bottom:2px;">⚡ Speed: <strong>${state.currentTrain.live_state.speed_kmh} km/h</strong></div>
+          <div style="font-size:0.85rem; margin-bottom:2px;">⏱️ Delay: <strong style="color:${isDelayed ? '#e11d48' : '#16a34a'};">+${state.currentTrain.live_state.current_delay_min} min</strong></div>
+          <div style="font-size:0.8rem; color:#64748b;">📍 Section: ${state.currentTrain.live_state.track_section || 'Main Line'} (${state.currentTrain.live_state.reference_pole || 'KM Ref'})</div>
+        </div>
+      `)
       .addTo(state.map);
 
     state.map.setView([tLat, tLng], 8);
   } else if (latlngs.length > 0) {
-    state.map.fitBounds(latlngs);
+    state.map.fitBounds(latlngs, { padding: [30, 30] });
   }
 }
 
