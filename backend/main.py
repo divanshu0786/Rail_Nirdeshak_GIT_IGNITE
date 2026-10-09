@@ -31,6 +31,25 @@ app = FastAPI(
     version="1.0.0"
 )
 
+@app.on_event("startup")
+def ensure_database_seeded():
+    """Ensure database has stations and trains populated on startup."""
+    db = SessionLocal()
+    try:
+        train_count = db.query(models.Train).count()
+        if train_count == 0:
+            print("[Rail Nirdeshak] Database is empty. Running auto-seeder...")
+            try:
+                import seed_data
+                seed_data.seed()
+                print("[Rail Nirdeshak] Database auto-seeding complete.")
+            except Exception as e:
+                print(f"[Rail Nirdeshak] Auto-seeding warning: {e}")
+    except Exception as err:
+        print(f"[Rail Nirdeshak] Startup DB check error: {err}")
+    finally:
+        db.close()
+
 # Enable CORS for frontend integration
 app.add_middleware(
     CORSMiddleware,

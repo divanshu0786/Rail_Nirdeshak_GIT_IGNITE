@@ -1,9 +1,32 @@
-// Rail Nirdeshak Frontend Core Controller
-const API_BASE = window.location.origin.includes(":8000") || window.location.origin.includes(":3000") || window.location.origin.includes(":5173")
-  ? window.location.origin
-  : "http://127.0.0.1:8000";
+// Rail Nirdeshak Dynamic API & WebSocket Resolver
+function resolveApiBase() {
+  if (typeof window === "undefined") return "http://127.0.0.1:8000";
+  
+  if (window.__API_BASE__) return window.__API_BASE__;
+  if (window.localStorage && localStorage.getItem("rn_api_base")) {
+    return localStorage.getItem("rn_api_base");
+  }
 
-const WS_BASE = API_BASE.replace(/^http/, 'ws');
+  const { protocol, hostname, origin, port } = window.location;
+
+  // Direct file:// access
+  if (protocol === "file:") {
+    return "http://127.0.0.1:8000";
+  }
+
+  // Local development dev servers (Vite 5173, Webpack 3000, Live Server 5500, etc.)
+  if ((hostname === "localhost" || hostname === "127.0.0.1") && port && !["8000", "10000"].includes(port)) {
+    return "http://127.0.0.1:8000";
+  }
+
+  // Same-origin deployments (Render, Docker, Railway, FastAPI static mount)
+  return origin;
+}
+
+const API_BASE = resolveApiBase();
+const WS_BASE = API_BASE.startsWith("https://")
+  ? API_BASE.replace(/^https:\/\//, "wss://")
+  : API_BASE.replace(/^http:\/\//, "ws://");
 
 let state = {
   user: null,
