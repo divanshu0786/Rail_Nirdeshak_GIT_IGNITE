@@ -7,6 +7,10 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./rail_nirdeshak.db")
 
+# Fix Render PostgreSQL URL scheme compatibility with SQLAlchemy 2.0
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 # connect_args={"check_same_thread": False} is required for SQLite in FastAPI
 engine = create_engine(
     DATABASE_URL,

@@ -2,12 +2,14 @@ services:
   - type: web
     name: rail-nirdeshak
     runtime: python
+    plan: free
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python backend/main.py"
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: DATABASE_URL
         value: sqlite:///./rail_nirdeshak.db
-
-
+      - key: HOST
+        value: 0.0.0.0
