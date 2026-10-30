@@ -10,14 +10,29 @@ class UserRegister(BaseModel):
     role: Optional[str] = "passenger"
 
 class UserLogin(BaseModel):
-    email: str
+    email: Optional[str] = None
+    railway_id: Optional[str] = None
+    username: Optional[str] = None
     password: str
+
+class RailwayIdLogin(BaseModel):
+    railway_id: str
+    password: str
+
+class ControllerCreate(BaseModel):
+    railway_id: str
+    email: str
+    full_name: str
+    password: str
+    role: Optional[str] = "controller"
 
 class UserOut(BaseModel):
     id: int
+    railway_id: Optional[str] = None
     email: str
     full_name: str
     role: str
+    is_active: bool = True
     created_at: datetime
 
     class Config:

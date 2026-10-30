@@ -4,10 +4,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from database import SessionLocal, engine, Base
 from models import User, Station, Train, RouteStop, LiveTrainState, FieldObservation, ETAPrediction
-import hashlib
+import bcrypt
 
 def hash_pw(pw: str) -> str:
-    return hashlib.sha256(pw.encode()).hexdigest()
+    salt = bcrypt.gensalt(rounds=12)
+    return bcrypt.hashpw(pw.encode('utf-8'), salt).decode('utf-8')
 
 def seed():
     Base.metadata.drop_all(bind=engine)
@@ -15,20 +16,32 @@ def seed():
     db = SessionLocal()
 
     try:
-        # 1. Users
+        # 1. Users with 12-Digit Railway Authority IDs & Bcrypt Hashed Passwords
         demo_user = User(
+            railway_id="111122223333",
             email="passenger@railnirdeshak.in",
             full_name="Rajesh Sharma",
             hashed_password=hash_pw("demo123"),
-            role="passenger"
+            role="passenger",
+            is_active=True
         )
         controller_user = User(
+            railway_id="123456789012",
             email="control@railnirdeshak.in",
             full_name="Northern Zone Controller",
             hashed_password=hash_pw("admin123"),
-            role="controller"
+            role="controller",
+            is_active=True
         )
-        db.add_all([demo_user, controller_user])
+        admin_user = User(
+            railway_id="987654321098",
+            email="drm.admin@railnirdeshak.in",
+            full_name="Divisional Railway Manager / Admin",
+            hashed_password=hash_pw("admin123"),
+            role="admin",
+            is_active=True
+        )
+        db.add_all([demo_user, controller_user, admin_user])
         db.commit()
 
         # 2. Stations

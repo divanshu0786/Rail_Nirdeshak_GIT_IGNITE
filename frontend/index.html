@@ -351,7 +351,7 @@
       </div>
     </section>
 
-    <!-- ================= TAB 5: CONTROL ROOM ================= -->
+        <!-- ================= TAB 5: CONTROL ROOM ================= -->
     <section id="tab-control" class="tab-pane">
 
       <!-- 1. RESTRICTED ACCESS GATE (Shown when unauthenticated or unauthorized) -->
@@ -439,100 +439,101 @@
               <i class="fa-solid fa-arrow-right-from-bracket"></i> Lock & Log Out
             </button>
           </div>
-        <div class="control-header-bar">
-          <div>
-            <h2><i class="fa-solid fa-tower-broadcast text-danger"></i> Division Traffic Control & Propagation Room</h2>
-            <p class="text-muted">Real-time corridor headway monitoring, delay cascade analysis, and field telemetry console.</p>
+          <div class="control-header-bar">
+            <div>
+              <h2><i class="fa-solid fa-tower-broadcast text-danger"></i> Division Traffic Control &amp; Propagation Room</h2>
+              <p class="text-muted">Real-time corridor headway monitoring, delay cascade analysis, and field telemetry console.</p>
+            </div>
+            <div class="ctrl-kpi-row">
+              <div class="kpi-card">
+                <span class="kpi-num text-cyan" id="kpi-active-trains">2</span>
+                <span class="kpi-label">Active Trains</span>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-num text-amber" id="kpi-delayed-trains">2</span>
+                <span class="kpi-label">Delayed Trains</span>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-num text-danger" id="kpi-prop-risks">1</span>
+                <span class="kpi-label">Propagation Alerts</span>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-num text-purple" id="kpi-field-alerts">2</span>
+                <span class="kpi-label">Field Observations</span>
+              </div>
+            </div>
           </div>
-          <div class="ctrl-kpi-row">
-            <div class="kpi-card">
-              <span class="kpi-num text-cyan" id="kpi-active-trains">2</span>
-              <span class="kpi-label">Active Trains</span>
-            </div>
-            <div class="kpi-card">
-              <span class="kpi-num text-amber" id="kpi-delayed-trains">2</span>
-              <span class="kpi-label">Delayed Trains</span>
-            </div>
-            <div class="kpi-card">
-              <span class="kpi-num text-danger" id="kpi-prop-risks">1</span>
-              <span class="kpi-label">Propagation Alerts</span>
-            </div>
-            <div class="kpi-card">
-              <span class="kpi-num text-purple" id="kpi-field-alerts">2</span>
-              <span class="kpi-label">Field Observations</span>
-            </div>
-          </div>
-        </div>
 
-        <!-- Active Section Monitoring Table -->
-        <div class="card panel-card mt-4">
-          <div class="panel-header">
-            <h3><i class="fa-solid fa-network-wired text-cyan"></i> Section Trains & Headway Status</h3>
-          </div>
-          <div class="panel-body">
-            <div class="route-table-wrapper">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Train No.</th>
-                    <th>Train Name</th>
-                    <th>Route</th>
-                    <th>Section</th>
-                    <th>Speed</th>
-                    <th>Delay</th>
-                    <th>Headway Risk</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody id="control-trains-tbody">
-                  <!-- Populated via JS -->
-                </tbody>
-              </table>
+          <!-- Active Section Monitoring Table -->
+          <div class="card panel-card mt-4">
+            <div class="panel-header">
+              <h3><i class="fa-solid fa-network-wired text-cyan"></i> Section Trains &amp; Headway Status</h3>
+            </div>
+            <div class="panel-body">
+              <div class="route-table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Train No.</th>
+                      <th>Train Name</th>
+                      <th>Route</th>
+                      <th>Section</th>
+                      <th>Speed</th>
+                      <th>Delay</th>
+                      <th>Headway Risk</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="control-trains-tbody">
+                    <!-- Populated via JS -->
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Field Observation Logger for Surveyors -->
-        <div class="card panel-card mt-4">
-          <div class="panel-header">
-            <h3><i class="fa-solid fa-plus-circle text-success"></i> Log On-Ground Survey / Field Observation</h3>
+          <!-- Field Observation Logger for Surveyors -->
+          <div class="card panel-card mt-4">
+            <div class="panel-header">
+              <h3><i class="fa-solid fa-plus-circle text-success"></i> Log On-Ground Survey / Field Observation</h3>
+            </div>
+            <div class="panel-body">
+              <form id="field-obs-form" onsubmit="submitFieldObservation(event)" class="obs-form-grid">
+                <div class="form-group">
+                  <label>Track Section</label>
+                  <input type="text" id="obs-section" required placeholder="e.g. NDLS-PNP-LINE1" value="NDLS-PNP-LINE1">
+                </div>
+                <div class="form-group">
+                  <label>Physical Reference / Pole</label>
+                  <input type="text" id="obs-pole" required placeholder="e.g. KM 54/12" value="KM 54/12">
+                </div>
+                <div class="form-group">
+                  <label>Observation Type</label>
+                  <select id="obs-type">
+                    <option value="SIGNAL_INTERLOCKING">Signal / Interlocking Work</option>
+                    <option value="SPEED_RESTRICTION">Track Speed Restriction</option>
+                    <option value="CONGESTION_HEADWAY">High Headway Congestion</option>
+                    <option value="WEATHER_FOG">Adverse Weather / Visibility</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Estimated Delay Impact (min)</label>
+                  <input type="number" id="obs-delay" required min="1" max="60" value="6">
+                </div>
+                <div class="form-group full-width">
+                  <label>Field Notes / Description</label>
+                  <input type="text" id="obs-desc" required placeholder="Describe on-ground track or signalling observation..." value="Cautious running advised due to track ballast packing machine ahead.">
+                </div>
+                <div class="form-group full-width">
+                  <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-paper-plane"></i> Dispatch Survey Observation
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-          <div class="panel-body">
-            <form id="field-obs-form" onsubmit="submitFieldObservation(event)" class="obs-form-grid">
-              <div class="form-group">
-                <label>Track Section</label>
-                <input type="text" id="obs-section" required placeholder="e.g. NDLS-PNP-LINE1" value="NDLS-PNP-LINE1">
-              </div>
-              <div class="form-group">
-                <label>Physical Reference / Pole</label>
-                <input type="text" id="obs-pole" required placeholder="e.g. KM 54/12" value="KM 54/12">
-              </div>
-              <div class="form-group">
-                <label>Observation Type</label>
-                <select id="obs-type">
-                  <option value="SIGNAL_INTERLOCKING">Signal / Interlocking Work</option>
-                  <option value="SPEED_RESTRICTION">Track Speed Restriction</option>
-                  <option value="CONGESTION_HEADWAY">High Headway Congestion</option>
-                  <option value="WEATHER_FOG">Adverse Weather / Visibility</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Estimated Delay Impact (min)</label>
-                <input type="number" id="obs-delay" required min="1" max="60" value="6">
-              </div>
-              <div class="form-group full-width">
-                <label>Field Notes / Description</label>
-                <input type="text" id="obs-desc" required placeholder="Describe on-ground track or signalling observation..." value="Cautious running advised due to track ballast packing machine ahead.">
-              </div>
-              <div class="form-group full-width">
-                <button type="submit" class="btn btn-primary">
-                  <i class="fa-solid fa-paper-plane"></i> Dispatch Survey Observation
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
 
+        </div>
       </div>
     </section>
 

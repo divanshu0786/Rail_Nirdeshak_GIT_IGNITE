@@ -1,12 +1,13 @@
 import os
 import time
+import re
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Tuple
 import jwt
 import hashlib
 import bcrypt
 from fastapi import Depends, HTTPException, status, Header, Query
-from fastapi.security import HTTPBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User
@@ -24,7 +25,7 @@ _failed_attempts: Dict[str, List[float]] = {}
 
 def record_failed_attempt(identifier: str) -> None:
     now = time.time()
-    key = identifier.strip().lower()
+    key = str(identifier).strip().lower()
     if key not in _failed_attempts:
         _failed_attempts[key] = []
     _failed_attempts[key] = [t for t in _failed_attempts[key] if now - t < LOCKOUT_WINDOW_SECONDS]
@@ -32,7 +33,7 @@ def record_failed_attempt(identifier: str) -> None:
 
 def is_rate_limited(identifier: str) -> Tuple[bool, int]:
     now = time.time()
-    key = identifier.strip().lower()
+    key = str(identifier).strip().lower()
     if key not in _failed_attempts:
         return False, 0
     recent = [t for t in _failed_attempts[key] if now - t < LOCKOUT_WINDOW_SECONDS]
@@ -44,8 +45,21 @@ def is_rate_limited(identifier: str) -> Tuple[bool, int]:
     return False, 0
 
 def clear_failed_attempts(identifier: str) -> None:
-    key = identifier.strip().lower()
+    key = str(identifier).strip().lower()
     _failed_attempts.pop(key, None)
+
+# ----------------- VALIDATION HELPERS -----------------
+def validate_railway_id(railway_id: Optional[str]) -> Optional[str]:
+    """Validate optional 12-digit Railway ID format."""
+    if not railway_id:
+        return None
+    val = str(railway_id).strip()
+    if not re.fullmatch(r"^\d{12}$", val):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please enter a valid 12-digit Railway ID (numeric only)."
+        )
+    return val
 
 # ----------------- PASSWORD HASHING (BCRYPT + LEGACY FALLBACK) -----------------
 def hash_password(password: str) -> str:
@@ -54,7 +68,7 @@ def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify password against bcrypt hash, with backward-compatible SHA-256 fallback."""
+    """Verify plain password against bcrypt hash, with fallback for backward compatibility."""
     if not hashed_password or not plain_password:
         return False
     
@@ -125,7 +139,7 @@ def require_current_user(user: Optional[User] = Depends(get_current_user)) -> Us
             detail="Authentication required. Please sign in.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    if not user.is_active:
+    if not getattr(user, "is_active", True):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Account is deactivated. Please contact an administrator.",
@@ -140,6 +154,16 @@ def require_controller_user(user: User = Depends(require_current_user)) -> User:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access forbidden: Controller or Admin privileges required.",
+        )
+    return user
+
+def require_admin_user(user: User = Depends(require_controller_user)) -> User:
+    """Require an authenticated user with Admin privileges."""
+    user_role = (user.role or "").strip().lower()
+    if user_role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access forbidden: Administrator privileges required.",
         )
     return user
 

@@ -12,10 +12,11 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=True)
+    railway_id = Column(String(12), unique=True, index=True, nullable=True)
     email = Column(String, unique=True, index=True, nullable=False)
     full_name = Column(String, nullable=False)
     hashed_password = Column(String, nullable=False)
-    role = Column(String, default="passenger") # "passenger", "controller", "admin"
+    role = Column(String, default="passenger") # "passenger", "controller", or "admin"
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)

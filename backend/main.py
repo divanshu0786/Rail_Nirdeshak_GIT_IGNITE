@@ -18,10 +18,13 @@ from auth import (
     get_current_user,
     require_current_user,
     require_controller_user,
+    require_admin_user,
     verify_ws_token,
     record_failed_attempt,
     is_rate_limited,
-    clear_failed_attempts
+    clear_failed_attempts,
+    SECRET_KEY,
+    ALGORITHM
 )
 from eta_engine import calculate_dynamic_eta
 from websocket_manager import manager
@@ -90,13 +93,13 @@ def register(user_in: schemas.UserRegister, db: Session = Depends(get_db)):
     if existing_email:
         raise HTTPException(status_code=400, detail="Email is already registered.")
     
-    # Check existing username if provided
+    # Check existing username or railway_id if provided
     username_clean = (user_in.username or user_in.email.split("@")[0]).strip().lower()
     existing_user = db.query(models.User).filter(models.User.username == username_clean).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Username is already taken.")
 
-    # Public registration can only register as 'passenger' (prevents privilege escalation)
+    # Public registration is strictly restricted to 'passenger' role
     assigned_role = "passenger"
 
     user = models.User(
@@ -122,7 +125,6 @@ def register(user_in: schemas.UserRegister, db: Session = Depends(get_db)):
 @app.post("/auth/login", response_model=schemas.TokenOut)
 @app.post("/api/auth/login", response_model=schemas.TokenOut)
 def login(creds: schemas.UserLogin, db: Session = Depends(get_db)):
-    # Support login with either username or email
     identifier = (creds.username or creds.email or "").strip().lower()
     if not identifier or not creds.password:
         raise HTTPException(status_code=400, detail="Username/Email and password are required.")
@@ -135,8 +137,11 @@ def login(creds: schemas.UserLogin, db: Session = Depends(get_db)):
             detail=f"Too many failed login attempts. Temporarily locked for {wait_sec} seconds."
         )
 
+    # Query user by username, railway_id, or email
     user = db.query(models.User).filter(
-        (models.User.username == identifier) | (models.User.email == identifier)
+        (models.User.username == identifier) |
+        (models.User.railway_id == identifier) |
+        (models.User.email == identifier)
     ).first()
 
     if not user or not verify_password(creds.password, user.hashed_password):

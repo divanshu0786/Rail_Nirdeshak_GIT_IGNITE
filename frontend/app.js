@@ -55,6 +55,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadAppConfig();
   initAuth();
   loadInitialTrains();
+
   setupSearchDropdown();
   setupStationAutocomplete();
 });
@@ -1205,9 +1206,23 @@ async function removeSavedTrain(trainId) {
 
 // ----------------- CONTROL ROOM AUTH & MANAGEMENT -----------------
 function isControllerAuthenticated() {
-  if (!state.controllerToken || !state.controllerUser) return false;
-  const role = (state.controllerUser.role || "").toLowerCase();
+  const token = state.controllerToken || (state.token && state.user && (state.user.role === "controller" || state.user.role === "admin") ? state.token : null);
+  const user = state.controllerUser || (state.user && (state.user.role === "controller" || state.user.role === "admin") ? state.user : null);
+  if (!token || !user) return false;
+  const role = (user.role || "").toLowerCase();
   return role === "controller" || role === "admin";
+}
+
+function getControllerToken() {
+  if (state.controllerToken) return state.controllerToken;
+  if (state.token && state.user && (state.user.role === "controller" || state.user.role === "admin")) {
+    return state.token;
+  }
+  return null;
+}
+
+function getControllerUser() {
+  return state.controllerUser || (state.user && (state.user.role === "controller" || state.user.role === "admin") ? state.user : null);
 }
 
 function checkControlRoomAccess() {
@@ -1217,10 +1232,11 @@ function checkControlRoomAccess() {
   if (isControllerAuthenticated()) {
     if (gate) gate.classList.add("hidden");
     if (dash) dash.classList.remove("hidden");
+    const user = getControllerUser();
     const userBadge = document.getElementById("ctrl-logged-in-user");
     const roleBadge = document.getElementById("ctrl-logged-in-role");
-    if (userBadge) userBadge.textContent = state.controllerUser.full_name || state.controllerUser.username;
-    if (roleBadge) roleBadge.textContent = state.controllerUser.role || "controller";
+    if (userBadge) userBadge.textContent = user.full_name || user.username;
+    if (roleBadge) roleBadge.textContent = user.role || "controller";
     loadControlRoom();
     connectControlWebSocket();
   } else {
@@ -1335,11 +1351,12 @@ function toggleControlPasswordVisibility() {
 }
 
 async function handleControlLogout() {
+  const token = getControllerToken();
   try {
-    if (state.controllerToken) {
+    if (token) {
       fetch(`${API_BASE}/api/auth/logout`, {
         method: "POST",
-        headers: { "Authorization": `Bearer ${state.controllerToken}` }
+        headers: { "Authorization": `Bearer ${token}` }
       }).catch(() => {});
     }
   } catch (_) {}
@@ -1376,10 +1393,11 @@ async function loadControlRoom() {
     return;
   }
 
+  const token = getControllerToken();
   try {
     const res = await fetch(`${API_BASE}/api/control-room/overview`, {
       headers: {
-        "Authorization": `Bearer ${state.controllerToken}`
+        "Authorization": `Bearer ${token}`
       }
     });
 
@@ -1411,7 +1429,7 @@ function renderControlRoom(ctrl) {
   if (elField) elField.textContent = ctrl.active_field_alerts;
 
   const tbody = document.getElementById("control-trains-tbody");
-  if (!tbody) return;
+  if (!tbody || !ctrl.trains) return;
 
   tbody.innerHTML = ctrl.trains.map(t => {
     const isPropHigh = t.propagation_risk === "HIGH";
@@ -1449,13 +1467,14 @@ async function submitFieldObservation(e) {
   const type = document.getElementById("obs-type").value;
   const delay = parseInt(document.getElementById("obs-delay").value, 10);
   const desc = document.getElementById("obs-desc").value;
+  const token = getControllerToken();
 
   try {
     const res = await fetch(`${API_BASE}/api/field-observations`, {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${state.controllerToken}`
+        "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify({
         track_section: section,
@@ -1476,6 +1495,9 @@ async function submitFieldObservation(e) {
       showToast("Survey observation logged & propagated across corridor!", "success");
       loadControlRoom();
       if (state.currentTrain) trackTrain(state.currentTrain.train_number, false);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.detail || "Failed to dispatch survey observation", "danger");
     }
   } catch (err) {
     showToast("Failed to dispatch survey observation", "danger");
@@ -1486,7 +1508,8 @@ function connectControlWebSocket() {
   if (!isControllerAuthenticated()) return;
   if (state.controlWs && state.controlWs.readyState === WebSocket.OPEN) return;
 
-  const ctrlWsUrl = `${WS_BASE}/ws/control-room?token=${encodeURIComponent(state.controllerToken)}`;
+  const token = getControllerToken();
+  const ctrlWsUrl = `${WS_BASE}/ws/control-room?token=${encodeURIComponent(token)}`;
   try {
     state.controlWs = new WebSocket(ctrlWsUrl);
     state.controlWs.onopen = () => {
