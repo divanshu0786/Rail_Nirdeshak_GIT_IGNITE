@@ -1552,3 +1552,429 @@ body {
   }
 }
 
+/* =========================================================
+   RAILWAY AUTHORITY LOGIN & CONTROL ROOM SECURITY CONSOLE
+   ========================================================= */
+.control-auth-container {
+  max-width: 520px;
+  margin: 2rem auto 4rem auto;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.official-login-card {
+  background: linear-gradient(160deg, #FFFFFF 0%, #F8FAFC 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 2.25rem 2rem 2rem 2rem;
+  box-shadow: 0 16px 36px rgba(22, 58, 99, 0.1), 0 2px 6px rgba(22, 58, 99, 0.04);
+  position: relative;
+  overflow: hidden;
+}
+
+.official-login-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #163A63 0%, #E87524 50%, #163A63 100%);
+}
+
+.official-card-badge-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.auth-security-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--success);
+  background: var(--success-bg);
+  border: 1px solid rgba(46, 125, 91, 0.25);
+  padding: 0.25rem 0.65rem;
+  border-radius: 20px;
+}
+
+.auth-dept-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--navy);
+  background: #EBF2F7;
+  padding: 0.25rem 0.65rem;
+  border-radius: 20px;
+}
+
+.official-login-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.authority-emblem-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--navy) 0%, #102B4B 100%);
+  color: #FFFFFF;
+  border: 2px solid rgba(232, 117, 36, 0.4);
+  box-shadow: 0 8px 20px rgba(22, 58, 99, 0.22);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  margin-bottom: 0.85rem;
+  animation: pulse-ring 3s infinite ease-in-out;
+}
+
+@keyframes pulse-ring {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+.authority-heading {
+  font-family: var(--font-heading);
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: var(--navy);
+  letter-spacing: -0.02em;
+  margin-bottom: 0.25rem;
+}
+
+.authority-subtitle {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--action-orange);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.auth-info-banner {
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  color: #1E40AF;
+  border-radius: 8px;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  line-height: 1.4;
+}
+
+.login-alert-banner {
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.login-alert-banner.alert-danger {
+  background: #FDF0F0;
+  border: 1px solid rgba(201, 76, 76, 0.35);
+  color: #B91C1C;
+}
+
+.official-group {
+  margin-bottom: 1.25rem;
+}
+
+.label-with-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+.official-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--navy);
+}
+
+.id-digit-counter {
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  transition: color 0.15s ease;
+}
+
+.official-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.official-input-wrap .input-prefix-icon {
+  position: absolute;
+  left: 1rem;
+  color: var(--steel);
+  font-size: 0.95rem;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.official-input-wrap input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.6rem;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: #FFFFFF;
+  color: var(--navy);
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.official-input-wrap input::placeholder {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.official-input-wrap input:focus {
+  border-color: var(--navy);
+  box-shadow: 0 0 0 3px rgba(22, 58, 99, 0.12);
+  outline: none;
+}
+
+.official-input-wrap input.input-error {
+  border-color: var(--critical) !important;
+  background: #FFFDFD !important;
+  box-shadow: 0 0 0 3px rgba(201, 76, 76, 0.15) !important;
+}
+
+.field-validation-msg {
+  color: var(--critical);
+  font-size: 0.78rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+  animation: shakeX 0.3s ease-out;
+}
+
+@keyframes shakeX {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+.password-wrap input {
+  padding-right: 2.8rem;
+}
+
+.pw-toggle-btn {
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--steel);
+  padding: 0.4rem 0.5rem;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, background 0.15s ease;
+  z-index: 3;
+}
+
+.pw-toggle-btn:hover {
+  color: var(--navy);
+  background: rgba(22, 58, 99, 0.06);
+}
+
+.btn-secure-login {
+  background: linear-gradient(135deg, var(--navy) 0%, #102B4B 100%);
+  color: #FFFFFF;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  padding: 0.85rem 1.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 14px rgba(22, 58, 99, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secure-login:hover {
+  background: linear-gradient(135deg, #102B4B 0%, #0A1B30 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(22, 58, 99, 0.3);
+}
+
+.btn-secure-login:active {
+  transform: translateY(0);
+}
+
+.official-quick-credentials {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px dashed var(--border);
+}
+
+.quick-cred-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.quick-cred-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.5rem;
+}
+
+.quick-cred-btn {
+  background: #F1F5F9;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.72rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.quick-cred-btn:hover {
+  background: #E2E8F0;
+  border-color: var(--steel);
+  transform: translateY(-1px);
+}
+
+.quick-cred-btn strong {
+  color: var(--navy);
+  font-weight: 700;
+}
+
+.quick-cred-btn code {
+  font-family: 'Consolas', 'Monaco', monospace;
+  color: var(--steel);
+  font-size: 0.75rem;
+}
+
+.quick-cred-btn.test-reject {
+  background: #FEF2F2;
+  border-color: rgba(201, 76, 76, 0.25);
+}
+
+.quick-cred-btn.test-reject strong {
+  color: #B91C1C;
+}
+
+.official-security-notice {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-top: 1.25rem;
+  line-height: 1.4;
+}
+
+.official-security-notice i {
+  color: var(--action-orange);
+  margin-top: 0.15rem;
+}
+
+/* Officer Console Banner in Dashboard Header */
+.ctrl-officer-banner {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  background: #F1F5F9;
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.85rem;
+  border-radius: 20px;
+  margin-bottom: 0.5rem;
+}
+
+.officer-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--navy);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.officer-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.officer-id-tag {
+  font-size: 0.78rem;
+  color: var(--steel);
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.officer-role-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  background: var(--navy);
+  padding: 0.15rem 0.55rem;
+  border-radius: 10px;
+}
+
+.btn-lock-console {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  margin-left: 0.25rem;
+  cursor: pointer;
+  border: 1px solid rgba(201, 76, 76, 0.4);
+  background: #FFF;
+  color: var(--critical);
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.btn-lock-console:hover {
+  background: var(--critical);
+  color: #FFFFFF;
+}
+

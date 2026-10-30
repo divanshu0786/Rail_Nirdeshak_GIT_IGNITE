@@ -11,12 +11,19 @@ from sqlalchemy.orm import Session
 from database import engine, Base, SessionLocal, get_db
 import models
 import schemas
+import re
+import jwt
 from auth import (
     hash_password,
     verify_password,
+    validate_railway_id,
     create_access_token,
     get_current_user,
-    require_current_user
+    require_current_user,
+    require_controller_user,
+    require_admin_user,
+    SECRET_KEY,
+    ALGORITHM
 )
 from eta_engine import calculate_dynamic_eta
 from websocket_manager import manager
@@ -73,17 +80,70 @@ def get_app_config():
     }
 
 # ----------------- AUTHENTICATION -----------------
+@app.post("/auth/control-login", response_model=schemas.TokenOut)
+@app.post("/auth/railway-login", response_model=schemas.TokenOut)
+def control_login(creds: schemas.RailwayIdLogin, db: Session = Depends(get_db)):
+    """
+    Railway Authority Login for Control Room access.
+    - Validates 12-digit numeric Railway ID.
+    - Verifies password against registered official database.
+    - Enforces active status and Controller or Admin role.
+    - Rejects unauthorized roles (e.g. passengers) with HTTP 403.
+    """
+    # 1. Validate ID format (strictly 12 numeric digits 0-9)
+    valid_id = validate_railway_id(creds.railway_id)
+
+    # 2. Look up user by Railway Authority ID
+    user = db.query(models.User).filter(models.User.railway_id == valid_id).first()
+
+    # 3. Reject if not registered or incorrect password
+    if not user or not verify_password(creds.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Railway ID or password."
+        )
+
+    # 4. Check account status
+    if not getattr(user, "is_active", True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is inactive. Please contact the Divisional Railway Administrator."
+        )
+
+    # 5. Check role authorization: Controller or Admin only
+    if user.role not in ["controller", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: This Railway ID belongs to a Passenger account. Controller or Admin privileges required."
+        )
+
+    # 6. Issue 24h JWT access token
+    token = create_access_token({
+        "sub": str(user.id),
+        "railway_id": user.railway_id,
+        "email": user.email,
+        "role": user.role,
+        "full_name": user.full_name
+    })
+    return {"access_token": token, "token_type": "bearer", "user": user}
+
 @app.post("/auth/register", response_model=schemas.TokenOut)
 def register(user_in: schemas.UserRegister, db: Session = Depends(get_db)):
+    """
+    Public passenger registration.
+    Security Rule: Passengers cannot self-grant controller or admin privileges.
+    """
     existing = db.query(models.User).filter(models.User.email == user_in.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     
+    # Public registration is strictly restricted to 'passenger' role
     user = models.User(
         email=user_in.email,
         full_name=user_in.full_name,
         hashed_password=hash_password(user_in.password),
-        role=user_in.role or "passenger"
+        role="passenger",
+        is_active=True
     )
     db.add(user)
     db.commit()
@@ -94,12 +154,69 @@ def register(user_in: schemas.UserRegister, db: Session = Depends(get_db)):
 
 @app.post("/auth/login", response_model=schemas.TokenOut)
 def login(creds: schemas.UserLogin, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == creds.email).first()
+    """
+    Unified login supporting email or 12-digit Railway ID.
+    """
+    user = None
+    identifier = (creds.railway_id or creds.username or creds.email or "").strip()
+
+    # Check if identifier is a 12-digit Railway ID
+    if re.fullmatch(r"^\d{12}$", identifier):
+        user = db.query(models.User).filter(models.User.railway_id == identifier).first()
+
+    # Otherwise query by email
+    if not user and creds.email:
+        user = db.query(models.User).filter(models.User.email == creds.email.strip()).first()
+
+    if not user and identifier:
+        user = db.query(models.User).filter(
+            (models.User.email == identifier) | (models.User.railway_id == identifier)
+        ).first()
+
     if not user or not verify_password(creds.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    
-    token = create_access_token({"sub": str(user.id), "email": user.email, "role": user.role})
+        raise HTTPException(status_code=401, detail="Invalid email/Railway ID or password")
+
+    if not getattr(user, "is_active", True):
+        raise HTTPException(status_code=403, detail="Account is inactive. Contact railway administrator.")
+
+    token = create_access_token({
+        "sub": str(user.id),
+        "railway_id": user.railway_id,
+        "email": user.email,
+        "role": user.role,
+        "full_name": user.full_name
+    })
     return {"access_token": token, "token_type": "bearer", "user": user}
+
+@app.post("/api/admin/create-controller", response_model=schemas.UserOut)
+def admin_create_controller(
+    ctrl_in: schemas.ControllerCreate,
+    admin_user: models.User = Depends(require_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Security Rule: Only administrators can create or authorize controller accounts.
+    """
+    valid_id = validate_railway_id(ctrl_in.railway_id)
+    existing_id = db.query(models.User).filter(models.User.railway_id == valid_id).first()
+    if existing_id:
+        raise HTTPException(status_code=400, detail="Railway ID already assigned to another official.")
+    existing_email = db.query(models.User).filter(models.User.email == ctrl_in.email).first()
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email already registered.")
+
+    new_controller = models.User(
+        railway_id=valid_id,
+        email=ctrl_in.email,
+        full_name=ctrl_in.full_name,
+        hashed_password=hash_password(ctrl_in.password),
+        role=ctrl_in.role if ctrl_in.role in ["controller", "admin"] else "controller",
+        is_active=True
+    )
+    db.add(new_controller)
+    db.commit()
+    db.refresh(new_controller)
+    return new_controller
 
 @app.get("/auth/me", response_model=schemas.UserOut)
 def get_me(user: models.User = Depends(require_current_user)):
@@ -529,7 +646,11 @@ def get_field_observations(limit: int = 10, db: Session = Depends(get_db)):
     return db.query(models.FieldObservation).order_by(models.FieldObservation.reported_at.desc()).limit(limit).all()
 
 @app.post("/api/field-observations", response_model=schemas.FieldObservationOut)
-def create_field_observation(obs_in: schemas.FieldObservationCreate, db: Session = Depends(get_db)):
+def create_field_observation(
+    obs_in: schemas.FieldObservationCreate,
+    user: models.User = Depends(require_controller_user),
+    db: Session = Depends(get_db)
+):
     obs = models.FieldObservation(
         station_id=obs_in.station_id,
         track_section=obs_in.track_section,
@@ -549,9 +670,12 @@ def create_field_observation(obs_in: schemas.FieldObservationCreate, db: Session
 def get_weather_data(lat: float = 28.6427, lon: float = 77.2195, location: Optional[str] = None):
     return weather_service.get_live_weather(lat, lon, location)
 
-# ----------------- CONTROL ROOM OVERVIEW -----------------
+# ----------------- CONTROL ROOM OVERVIEW (PROTECTED) -----------------
 @app.get("/api/control-room/overview")
-def get_control_room_overview(db: Session = Depends(get_db)):
+def get_control_room_overview(
+    user: models.User = Depends(require_controller_user),
+    db: Session = Depends(get_db)
+):
     trains = db.query(models.Train).filter(models.Train.is_active == True).all()
     observations = db.query(models.FieldObservation).all()
     
@@ -586,6 +710,12 @@ def get_control_room_overview(db: Session = Depends(get_db)):
         })
 
     return {
+        "authorized_official": {
+            "id": user.id,
+            "railway_id": user.railway_id,
+            "name": user.full_name,
+            "role": user.role
+        },
         "active_trains_count": len(trains),
         "delayed_trains_count": total_delayed,
         "high_risk_propagations": high_propagation_risks,
@@ -605,7 +735,7 @@ def get_control_room_overview(db: Session = Depends(get_db)):
         ]
     }
 
-# ----------------- WEBSOCKET ENDPOINTS -----------------
+# ----------------- WEBSOCKET ENDPOINTS (PROTECTED CONTROL ROOM) -----------------
 @app.websocket("/ws/trains/{train_id}")
 async def websocket_train_endpoint(websocket: WebSocket, train_id: int):
     await manager.connect_train(websocket, train_id)
@@ -619,7 +749,30 @@ async def websocket_train_endpoint(websocket: WebSocket, train_id: int):
         manager.disconnect_train(websocket, train_id)
 
 @app.websocket("/ws/control-room")
-async def websocket_control_endpoint(websocket: WebSocket):
+async def websocket_control_endpoint(websocket: WebSocket, token: Optional[str] = None):
+    # Verify official token & Controller / Admin privileges
+    if not token:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication required")
+        return
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        sub = payload.get("sub")
+        if not sub:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token")
+            return
+        db = SessionLocal()
+        user = db.query(models.User).filter(models.User.id == int(sub)).first()
+        db.close()
+        if not user or not getattr(user, "is_active", True):
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Inactive account")
+            return
+        if user.role not in ["controller", "admin"]:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Controller role required")
+            return
+    except Exception:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication failed")
+        return
+
     await manager.connect_control(websocket)
     try:
         while True:

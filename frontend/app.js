@@ -50,7 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadAppConfig();
   initAuth();
   loadInitialTrains();
-  loadControlRoom();
+  setupControlRoomAuthUI();
   setupSearchDropdown();
   setupStationAutocomplete();
 });
@@ -91,7 +91,7 @@ function switchTab(tabId) {
   } else if (tabId === "saved") {
     loadSavedTrains();
   } else if (tabId === "control") {
-    loadControlRoom();
+    renderControlTabState();
   }
 }
 
@@ -1199,28 +1199,292 @@ async function removeSavedTrain(trainId) {
   }
 }
 
-// ----------------- CONTROL ROOM -----------------
-async function loadControlRoom() {
+// ----------------- CONTROL ROOM AUTH & ACCESS CONTROL -----------------
+let controlWs = null;
+
+function isAuthorizedOfficial() {
+  return state.user && state.user.is_active !== false && (state.user.role === "controller" || state.user.role === "admin");
+}
+
+function renderControlTabState() {
+  const loginView = document.getElementById("control-login-view");
+  const dashView = document.getElementById("control-dashboard-view");
+  const psgNotice = document.getElementById("ctrl-passenger-notice");
+
+  if (isAuthorizedOfficial()) {
+    if (loginView) loginView.classList.add("hidden");
+    if (dashView) dashView.classList.remove("hidden");
+
+    const nameEl = document.getElementById("ctrl-officer-name");
+    const idEl = document.getElementById("ctrl-officer-id");
+    const roleEl = document.getElementById("ctrl-officer-role");
+    if (nameEl) nameEl.textContent = state.user.full_name || "Railway Official";
+    if (idEl) idEl.textContent = state.user.railway_id || "OFFICIAL";
+    if (roleEl) roleEl.textContent = state.user.role === "admin" ? "Divisional Admin (DRM)" : "Zone Controller";
+
+    loadControlRoom();
+    connectControlWebSocket();
+  } else {
+    if (loginView) loginView.classList.remove("hidden");
+    if (dashView) dashView.classList.add("hidden");
+
+    if (psgNotice) {
+      if (state.user && state.user.role === "passenger") {
+        psgNotice.classList.remove("hidden");
+      } else {
+        psgNotice.classList.add("hidden");
+      }
+    }
+  }
+}
+
+function setupControlRoomAuthUI() {
+  const idInput = document.getElementById("ctrl-railway-id");
+  const counter = document.getElementById("ctrl-id-counter");
+
+  if (!idInput) return;
+
+  idInput.addEventListener("input", (e) => {
+    const raw = e.target.value;
+    // Strict requirement: Accept numeric characters only (0–9).
+    // Do not allow alphabets, spaces or special characters.
+    const numericOnly = raw.replace(/\D/g, "").slice(0, 12);
+
+    if (raw !== numericOnly) {
+      showRailwayIdError("Please enter a valid 12-digit Railway ID.");
+    } else if (numericOnly.length === 12) {
+      hideRailwayIdError();
+    }
+
+    e.target.value = numericOnly;
+
+    if (counter) {
+      counter.textContent = `${numericOnly.length} / 12 Digits`;
+      counter.style.color = numericOnly.length === 12 ? "var(--success)" : "var(--text-dim)";
+    }
+  });
+
+  idInput.addEventListener("blur", () => {
+    const val = idInput.value.trim();
+    if (val.length > 0 && val.length !== 12) {
+      showRailwayIdError("Please enter a valid 12-digit Railway ID.");
+    }
+  });
+}
+
+function showRailwayIdError(msg) {
+  const errorEl = document.getElementById("ctrl-id-error");
+  const input = document.getElementById("ctrl-railway-id");
+  if (errorEl) {
+    const span = errorEl.querySelector("span");
+    if (span) span.textContent = msg || "Please enter a valid 12-digit Railway ID.";
+    errorEl.classList.remove("hidden");
+  }
+  if (input) {
+    input.classList.add("input-error");
+  }
+}
+
+function hideRailwayIdError() {
+  const errorEl = document.getElementById("ctrl-id-error");
+  const input = document.getElementById("ctrl-railway-id");
+  if (errorEl) errorEl.classList.add("hidden");
+  if (input) input.classList.remove("input-error");
+}
+
+function togglePasswordVisibility(inputId, iconId) {
+  const input = document.getElementById(inputId);
+  const icon = document.getElementById(iconId);
+  if (!input) return;
+  if (input.type === "password") {
+    input.type = "text";
+    if (icon) icon.className = "fa-solid fa-eye-slash";
+  } else {
+    input.type = "password";
+    if (icon) icon.className = "fa-solid fa-eye";
+  }
+}
+
+function quickFillOfficial(railwayId, password) {
+  const idInput = document.getElementById("ctrl-railway-id");
+  const pwInput = document.getElementById("ctrl-password");
+  const counter = document.getElementById("ctrl-id-counter");
+  if (idInput) {
+    idInput.value = railwayId;
+    if (counter) {
+      counter.textContent = `${railwayId.length} / 12 Digits`;
+      counter.style.color = "var(--success)";
+    }
+    hideRailwayIdError();
+  }
+  if (pwInput) pwInput.value = password;
+  const alertEl = document.getElementById("ctrl-login-alert");
+  if (alertEl) alertEl.classList.add("hidden");
+}
+
+async function handleControlRoomLogin(e) {
+  e.preventDefault();
+  const idInput = document.getElementById("ctrl-railway-id");
+  const pwInput = document.getElementById("ctrl-password");
+  const alertEl = document.getElementById("ctrl-login-alert");
+  const submitBtn = document.getElementById("btn-ctrl-submit");
+
+  const railwayId = idInput ? idInput.value.trim() : "";
+  const password = pwInput ? pwInput.value : "";
+
+  // 1. Frontend Validation: Exactly 12 numeric digits (0-9)
+  const isValid12Digits = /^\d{12}$/.test(railwayId);
+  if (!isValid12Digits) {
+    showRailwayIdError("Please enter a valid 12-digit Railway ID.");
+    if (idInput) idInput.focus();
+    return;
+  }
+
+  if (!password) {
+    if (alertEl) {
+      alertEl.className = "login-alert-banner alert-danger";
+      alertEl.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> <span>Please enter your password.</span>`;
+      alertEl.classList.remove("hidden");
+    }
+    if (pwInput) pwInput.focus();
+    return;
+  }
+
+  hideRailwayIdError();
+  if (alertEl) alertEl.classList.add("hidden");
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Verifying Authority...`;
+  }
+
   try {
-    const res = await fetch(`${API_BASE}/api/control-room/overview`);
+    const res = await fetch(`${API_BASE}/auth/control-login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ railway_id: railwayId, password })
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      state.token = data.access_token;
+      state.user = data.user;
+      localStorage.setItem("rn_token", state.token);
+      updateUserUI();
+      showToast(`Railway Authority verified. Welcome, ${data.user.full_name}!`, "success");
+      renderControlTabState();
+    } else {
+      const errorMsg = data.detail || "Authentication failed.";
+      if (alertEl) {
+        alertEl.className = "login-alert-banner alert-danger";
+        alertEl.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> <span>${errorMsg}</span>`;
+        alertEl.classList.remove("hidden");
+      }
+      showToast(errorMsg, "danger");
+      if (res.status === 400) {
+        showRailwayIdError(errorMsg);
+      }
+    }
+  } catch (err) {
+    if (alertEl) {
+      alertEl.className = "login-alert-banner alert-danger";
+      alertEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> <span>Network error connecting to Railway Authority auth server.</span>`;
+      alertEl.classList.remove("hidden");
+    }
+    showToast("Network error connecting to auth server", "danger");
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `<i class="fa-solid fa-shield-halved"></i> Secure Login`;
+    }
+  }
+}
+
+function logoutControlRoom() {
+  logout();
+  renderControlTabState();
+  showToast("Control Room console secured and locked.", "info");
+}
+
+// ----------------- CONTROL ROOM DASHBOARD DATA -----------------
+async function loadControlRoom() {
+  if (!isAuthorizedOfficial() || !state.token) {
+    renderControlTabState();
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/control-room/overview`, {
+      headers: {
+        "Authorization": `Bearer ${state.token}`
+      }
+    });
+
     if (res.ok) {
       state.controlData = await res.json();
       renderControlRoom(state.controlData);
+    } else if (res.status === 401 || res.status === 403) {
+      logout();
+      renderControlTabState();
+      showToast("Control Room access unauthorized or session expired.", "danger");
     }
   } catch (e) {
     console.warn("Failed loading control room overview:", e);
   }
 }
 
+function connectControlWebSocket() {
+  if (!isAuthorizedOfficial() || !state.token) return;
+  if (controlWs) {
+    try { controlWs.close(); } catch (e) {}
+  }
+
+  const wsUrl = `${WS_BASE}/ws/control-room?token=${encodeURIComponent(state.token)}`;
+  try {
+    controlWs = new WebSocket(wsUrl);
+
+    controlWs.onopen = () => {
+      console.debug("Control Room WebSocket connected.");
+    };
+
+    controlWs.onmessage = (evt) => {
+      try {
+        const data = JSON.parse(evt.data);
+        if (data.type === "TELEMETRY_UPDATE" || data.type === "SIMULATION_STEP") {
+          loadControlRoom();
+        }
+      } catch (e) {
+        console.warn("Control WS parse error:", e);
+      }
+    };
+
+    controlWs.onclose = (e) => {
+      if (e.code === 1008) {
+        console.warn("Control Room WebSocket policy violation: unauthorized");
+      }
+    };
+  } catch (err) {
+    console.debug("Control WS note:", err);
+  }
+}
+
 function renderControlRoom(ctrl) {
   if (!ctrl) return;
 
-  document.getElementById("kpi-active-trains").textContent = ctrl.active_trains_count;
-  document.getElementById("kpi-delayed-trains").textContent = ctrl.delayed_trains_count;
-  document.getElementById("kpi-prop-risks").textContent = ctrl.high_risk_propagations;
-  document.getElementById("kpi-field-alerts").textContent = ctrl.active_field_alerts;
+  const actEl = document.getElementById("kpi-active-trains");
+  const dlyEl = document.getElementById("kpi-delayed-trains");
+  const prpEl = document.getElementById("kpi-prop-risks");
+  const fldEl = document.getElementById("kpi-field-alerts");
+
+  if (actEl) actEl.textContent = ctrl.active_trains_count;
+  if (dlyEl) dlyEl.textContent = ctrl.delayed_trains_count;
+  if (prpEl) prpEl.textContent = ctrl.high_risk_propagations;
+  if (fldEl) fldEl.textContent = ctrl.active_field_alerts;
 
   const tbody = document.getElementById("control-trains-tbody");
+  if (!tbody || !ctrl.trains) return;
+
   tbody.innerHTML = ctrl.trains.map(t => {
     const isPropHigh = t.propagation_risk === "HIGH";
     return `
@@ -1246,6 +1510,12 @@ function renderControlRoom(ctrl) {
 
 async function submitFieldObservation(e) {
   e.preventDefault();
+  if (!isAuthorizedOfficial()) {
+    showToast("Authorized Controller role required to log field survey observations.", "danger");
+    renderControlTabState();
+    return;
+  }
+
   const section = document.getElementById("obs-section").value;
   const pole = document.getElementById("obs-pole").value;
   const type = document.getElementById("obs-type").value;
@@ -1255,7 +1525,10 @@ async function submitFieldObservation(e) {
   try {
     const res = await fetch(`${API_BASE}/api/field-observations`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${state.token}`
+      },
       body: JSON.stringify({
         track_section: section,
         pole_reference: pole,
@@ -1268,6 +1541,9 @@ async function submitFieldObservation(e) {
       showToast("Survey observation logged & propagated across corridor!", "success");
       loadControlRoom();
       if (state.currentTrain) trackTrain(state.currentTrain.train_number, false);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.detail || "Failed to dispatch survey observation", "danger");
     }
   } catch (err) {
     showToast("Failed to dispatch survey observation", "danger");

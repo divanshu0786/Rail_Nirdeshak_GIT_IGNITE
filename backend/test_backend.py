@@ -2,8 +2,10 @@ import os
 import sys
 from fastapi.testclient import TestClient
 
-# Ensure backend directory is in path
+# Ensure backend directory is in path and stdout is utf-8
 sys.path.insert(0, os.path.dirname(__file__))
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 from main import app
 from seed_data import seed
@@ -22,11 +24,55 @@ def run_tests():
     print("\n3. Testing Auth Login with seeded user...")
     res = client.post("/auth/login", json={"email": "passenger@railnirdeshak.in", "password": "demo123"})
     print("Login response:", res.json())
-    token = res.json()["access_token"]
-    print("✓ Login successful, token received:", token[:20], "...")
+    passenger_token = res.json()["access_token"]
+    print("✓ Passenger login successful, token received:", passenger_token[:20], "...")
+
+    print("\n3b. Testing Railway Official ID-Based Login Validation...")
+    # Test 1: 11-digit ID -> Rejected (400)
+    res = client.post("/auth/control-login", json={"railway_id": "12345678901", "password": "admin123"})
+    assert res.status_code == 400, f"Expected 400 for 11-digit ID, got {res.status_code}"
+    assert "Please enter a valid 12-digit Railway ID." in res.json()["detail"]
+    print("✓ 11-digit ID correctly rejected with 400:", res.json()["detail"])
+
+    # Test 2: 13-digit ID -> Rejected (400)
+    res = client.post("/auth/control-login", json={"railway_id": "1234567890123", "password": "admin123"})
+    assert res.status_code == 400, f"Expected 400 for 13-digit ID, got {res.status_code}"
+    assert "Please enter a valid 12-digit Railway ID." in res.json()["detail"]
+    print("✓ 13-digit ID correctly rejected with 400:", res.json()["detail"])
+
+    # Test 3: Alphabetic characters -> Rejected (400)
+    res = client.post("/auth/control-login", json={"railway_id": "12345ABC9012", "password": "admin123"})
+    assert res.status_code == 400, f"Expected 400 for alphabetic ID, got {res.status_code}"
+    assert "Please enter a valid 12-digit Railway ID." in res.json()["detail"]
+    print("✓ Alphabetic characters correctly rejected with 400:", res.json()["detail"])
+
+    # Test 4: Valid 12-digit ID with incorrect password -> Rejected (401)
+    res = client.post("/auth/control-login", json={"railway_id": "123456789012", "password": "wrongpassword!"})
+    assert res.status_code == 401, f"Expected 401 for wrong password, got {res.status_code}"
+    print("✓ Valid 12-digit ID with incorrect password rejected with 401:", res.json()["detail"])
+
+    # Test 5: Valid 12-digit ID belonging to a passenger -> Access denied (403)
+    res = client.post("/auth/control-login", json={"railway_id": "111122223333", "password": "demo123"})
+    assert res.status_code == 403, f"Expected 403 for passenger role, got {res.status_code}"
+    print("✓ Valid ID belonging to passenger denied with 403:", res.json()["detail"])
+
+    # Test 6: Valid authorized Railway ID and correct password -> Access granted (200)
+    res = client.post("/auth/control-login", json={"railway_id": "123456789012", "password": "admin123"})
+    assert res.status_code == 200, f"Expected 200 for controller, got {res.status_code}: {res.text}"
+    controller_data = res.json()
+    controller_token = controller_data["access_token"]
+    assert controller_data["user"]["role"] == "controller"
+    assert controller_data["user"]["railway_id"] == "123456789012"
+    print("✓ Valid authorized Railway ID and password granted access:", controller_data["user"]["full_name"])
+
+    # Test 7: Admin Railway ID and correct password -> Access granted (200)
+    res = client.post("/auth/control-login", json={"railway_id": "987654321098", "password": "admin123"})
+    assert res.status_code == 200
+    admin_token = res.json()["access_token"]
+    print("✓ Admin Railway ID verified:", res.json()["user"]["full_name"])
 
     print("\n4. Testing /auth/me with Bearer token...")
-    res = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    res = client.get("/auth/me", headers={"Authorization": f"Bearer {passenger_token}"})
     assert res.status_code == 200, f"/auth/me failed with status {res.status_code}: {res.text}"
     assert res.json()["email"] == "passenger@railnirdeshak.in"
     print("✓ /auth/me OK for user:", res.json()["full_name"])
@@ -66,11 +112,23 @@ def run_tests():
     assert res.status_code == 200
     print("✓ Live Telemetry accepted and recalculated:", res.json()["status"])
 
-    print("\n8. Testing Control Room Overview...")
+    print("\n8. Testing Control Room Protection & Overview...")
+    # Unauthenticated direct access -> Blocked (401)
     res = client.get("/api/control-room/overview")
-    assert res.status_code == 200
+    assert res.status_code == 401, f"Expected 401 for unauthenticated overview, got {res.status_code}"
+    print("✓ Unauthenticated direct access blocked with 401")
+
+    # Access with Passenger token -> Blocked (403)
+    res = client.get("/api/control-room/overview", headers={"Authorization": f"Bearer {passenger_token}"})
+    assert res.status_code == 403, f"Expected 403 for passenger role, got {res.status_code}"
+    print("✓ Passenger token access to Control Room blocked with 403")
+
+    # Access with Controller token -> Granted (200)
+    res = client.get("/api/control-room/overview", headers={"Authorization": f"Bearer {controller_token}"})
+    assert res.status_code == 200, f"Expected 200 for controller, got {res.status_code}"
     ctrl = res.json()
-    print(f"✓ Control room overview OK. Active trains: {ctrl['active_trains_count']}, Delayed: {ctrl['delayed_trains_count']}, High Prop Risks: {ctrl['high_risk_propagations']}")
+    assert "authorized_official" in ctrl
+    print(f"✓ Control room overview granted for Official: {ctrl['authorized_official']['name']} ({ctrl['authorized_official']['railway_id']})")
 
     print("\n9. Testing Frontend Static index.html root serving...")
     res = client.get("/")
@@ -79,9 +137,9 @@ def run_tests():
     print("✓ Frontend index.html served seamlessly from root /")
 
     print("\n10. Testing Saved Trains flow...")
-    res = client.post("/api/saved-trains/1", headers={"Authorization": f"Bearer {token}"})
+    res = client.post("/api/saved-trains/1", headers={"Authorization": f"Bearer {passenger_token}"})
     assert res.status_code == 200
-    res = client.get("/api/saved-trains", headers={"Authorization": f"Bearer {token}"})
+    res = client.get("/api/saved-trains", headers={"Authorization": f"Bearer {passenger_token}"})
     assert res.status_code == 200
     saved = res.json()
     assert len(saved) >= 1
@@ -92,7 +150,7 @@ def run_tests():
     assert res.status_code == 200
     print("✓ Telemetry step simulation OK. New state updated.")
 
-    print("\n12. Testing Field Survey logging...")
+    print("\n12. Testing Field Survey logging & Protection...")
     obs_payload = {
         "track_section": "NDLS-PNP-LINE1",
         "pole_reference": "KM 55/10",
@@ -100,7 +158,16 @@ def run_tests():
         "description": "Signal clearance speed restriction test",
         "impact_delay_min": 4
     }
+    # Unauthenticated -> 401
     res = client.post("/api/field-observations", json=obs_payload)
+    assert res.status_code == 401, f"Expected 401, got {res.status_code}"
+    # Passenger -> 403
+    res = client.post("/api/field-observations", json=obs_payload, headers={"Authorization": f"Bearer {passenger_token}"})
+    assert res.status_code == 403, f"Expected 403, got {res.status_code}"
+    # Controller -> 200
+    res = client.post("/api/field-observations", json=obs_payload, headers={"Authorization": f"Bearer {controller_token}"})
+    assert res.status_code == 200, f"Expected 200, got {res.status_code}"
+    print("✓ Field Survey logging protection verified (401 unauth, 403 passenger, 200 controller).")
     print("\n13. Testing 6-Month Dataset History Sampling & Replay...")
     res = client.get("/api/telemetry/history-samples/12497")
     assert res.status_code == 200
