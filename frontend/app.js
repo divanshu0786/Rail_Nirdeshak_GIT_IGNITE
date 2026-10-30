@@ -1552,6 +1552,8 @@ async function sendControlPhoneVerification() {
       msg = "SMS quota exceeded for today. Please contact system administrator.";
     } else if (err.code === "auth/too-many-requests") {
       msg = "Too many attempts from this IP. Please wait a few minutes before retrying.";
+    } else if (err.code === "auth/operation-not-allowed") {
+      msg = "SMS not enabled for this region by Firebase. Please add +919876543210 under Firebase Console -> Authentication -> Sign-in method -> Phone -> 'Phone numbers for testing' (with OTP 123456), or enable India (+91) under Settings -> SMS Region Policy.";
     }
     showControlLoginError(msg);
 
