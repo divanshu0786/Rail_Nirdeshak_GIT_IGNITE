@@ -1424,6 +1424,16 @@ function switchBackToPasswordLogin() {
   resetToPhoneStep();
 }
 
+function handleControlFormSubmit(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const phoneStep = document.getElementById("control-phone-step");
+  if (phoneStep && !phoneStep.classList.contains("hidden")) {
+    sendControlPhoneVerification();
+  } else {
+    handleControlOtpSubmit(e);
+  }
+}
+
 async function sendControlPhoneVerification() {
   if (isControlOtpSending) return;
 
@@ -1450,16 +1460,39 @@ async function sendControlPhoneVerification() {
 
   try {
     // 1. Verify Railway ID against trusted backend registry
-    const res = await fetch(`${API_BASE}/api/auth/request-phone-verification`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ railway_id: railwayId })
-    });
+    let res = null;
+    let data = {};
+    const endpointsToTry = [
+      `${API_BASE}/api/auth/request-phone-verification`,
+      `${API_BASE}/auth/request-phone-verification`,
+      `http://127.0.0.1:8000/api/auth/request-phone-verification`,
+      `http://127.0.0.1:8001/api/auth/request-phone-verification`
+    ];
 
-    const data = await res.json().catch(() => ({}));
+    for (const url of endpointsToTry) {
+      try {
+        const attempt = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ railway_id: railwayId })
+        });
+        if (attempt.status !== 404 && attempt.status !== 405) {
+          res = attempt;
+          data = await attempt.json().catch(() => ({}));
+          break;
+        }
+      } catch (_) { }
+    }
 
-    if (!res.ok) {
-      const errorMsg = data.detail || "Verification failed. Please check your Railway ID.";
+    if (!res || !res.ok) {
+      let errorMsg = "Verification failed. Please check your Railway ID.";
+      if (res && res.status === 405) {
+        errorMsg = "Server returned Method Not Allowed. Please ensure the backend is started via `python backend/main.py`.";
+      } else if (data && data.detail) {
+        errorMsg = data.detail;
+      } else if (!res) {
+        errorMsg = "Cannot connect to Rail Nirdeshak backend. Please start the server (`python backend/main.py`).";
+      }
       showControlLoginError(errorMsg);
       isControlOtpSending = false;
       if (sendBtn) sendBtn.disabled = false;
@@ -1592,18 +1625,34 @@ async function handleControlOtpSubmit(e) {
     const idToken = await fbUser.getIdToken(true);
 
     // 3. Submit Firebase ID token and challenge session ID to FastAPI backend
-    const res = await fetch(`${API_BASE}/api/auth/verify-firebase-session`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        id_token: idToken,
-        session_id: state.pendingChallenge.session_id,
-        railway_id: state.pendingChallenge.railway_id
-      })
-    });
+    let res = null;
+    let result = {};
+    const verifyEndpoints = [
+      `${API_BASE}/api/auth/verify-firebase-session`,
+      `${API_BASE}/auth/verify-firebase-session`,
+      `http://127.0.0.1:8000/api/auth/verify-firebase-session`,
+      `http://127.0.0.1:8001/api/auth/verify-firebase-session`
+    ];
 
-    const result = await res.json().catch(() => ({}));
+    for (const vUrl of verifyEndpoints) {
+      try {
+        const attempt = await fetch(vUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            id_token: idToken,
+            session_id: state.pendingChallenge.session_id,
+            railway_id: state.pendingChallenge.railway_id
+          })
+        });
+        if (attempt.status !== 404 && attempt.status !== 405) {
+          res = attempt;
+          result = await attempt.json().catch(() => ({}));
+          break;
+        }
+      } catch (_) { }
+    }
 
     if (!res.ok) {
       const errDetail = result.detail || "Backend security check rejected session.";

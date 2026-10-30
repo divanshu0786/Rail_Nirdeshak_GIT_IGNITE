@@ -193,6 +193,9 @@ def login(creds: schemas.UserLogin, db: Session = Depends(get_db)):
 # ----------------- FIREBASE PHONE OTP AUTHENTICATION -----------------
 
 @app.post("/api/auth/request-phone-verification", response_model=schemas.PhoneVerificationResponse)
+@app.post("/auth/request-phone-verification", response_model=schemas.PhoneVerificationResponse)
+@app.post("/api/auth/request-phone-verification/", response_model=schemas.PhoneVerificationResponse)
+@app.post("/auth/request-phone-verification/", response_model=schemas.PhoneVerificationResponse)
 def request_phone_verification(req: schemas.PhoneVerificationRequest, request: Request, db: Session = Depends(get_db)):
     """
     Initiate Firebase Phone Authentication workflow:
@@ -269,6 +272,9 @@ def request_phone_verification(req: schemas.PhoneVerificationRequest, request: R
 
 
 @app.post("/api/auth/verify-firebase-session", response_model=schemas.TokenOut)
+@app.post("/auth/verify-firebase-session", response_model=schemas.TokenOut)
+@app.post("/api/auth/verify-firebase-session/", response_model=schemas.TokenOut)
+@app.post("/auth/verify-firebase-session/", response_model=schemas.TokenOut)
 def verify_firebase_session(req: schemas.FirebaseSessionVerifyRequest, response: Response, db: Session = Depends(get_db)):
     """
     Validate Firebase ID Token and finalize authenticated Control Room session:
@@ -935,6 +941,16 @@ import os
 from starlette.staticfiles import StaticFiles
 
 frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
+
+@app.post("/")
+@app.post("/index.html")
+def root_post_fallback():
+    from starlette.responses import FileResponse
+    index_file = os.path.join(frontend_dir, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    return {"status": "ok"}
+
 if os.path.exists(frontend_dir):
     app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
 

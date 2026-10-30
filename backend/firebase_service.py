@@ -41,7 +41,15 @@ def init_firebase_admin() -> bool:
         _firebase_initialized = True
         return True
 
-    key_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY")
+    key_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY") or "./firebase-service-account.json"
+    if not os.path.exists(key_path):
+        if os.path.exists("./firebase-service-account.json"):
+            key_path = "./firebase-service-account.json"
+        elif os.path.exists("./firebase-service-account.json.json"):
+            key_path = "./firebase-service-account.json.json"
+        elif os.path.exists(key_path + ".json"):
+            key_path = key_path + ".json"
+
     key_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
     google_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
     project_id = os.getenv("FIREBASE_PROJECT_ID", "rail-nirdeshak")

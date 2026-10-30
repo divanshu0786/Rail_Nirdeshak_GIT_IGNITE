@@ -391,7 +391,7 @@
           </div>
 
           <!-- FIREBASE PHONE OTP 2FA AUTHENTICATION -->
-          <form id="control-login-form" onsubmit="handleControlOtpSubmit(event)" class="control-auth-form" novalidate>
+          <form id="control-login-form" onsubmit="handleControlFormSubmit(event)" action="javascript:void(0);" class="control-auth-form" novalidate>
             <!-- Error message container -->
             <div id="control-login-error" class="control-auth-error hidden">
               <i class="fa-solid fa-triangle-exclamation"></i>
@@ -413,6 +413,7 @@
                     pattern="[0-9]{12}"
                     inputmode="numeric"
                     autocomplete="username"
+                    onkeydown="if(event.key === 'Enter'){ event.preventDefault(); sendControlPhoneVerification(); }"
                   >
                 </div>
               </div>
