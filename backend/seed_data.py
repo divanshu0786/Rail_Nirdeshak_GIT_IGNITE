@@ -10,6 +10,45 @@ def hash_pw(pw: str) -> str:
     salt = bcrypt.gensalt(rounds=12)
     return bcrypt.hashpw(pw.encode('utf-8'), salt).decode('utf-8')
 
+def seed_controller_if_missing(db):
+    admin_username = os.environ.get("ADMIN_USERNAME", "controller")
+    admin_email = os.environ.get("ADMIN_EMAIL", "control@railnirdeshak.in")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "Admin@Rail2026!")
+    admin_name = os.environ.get("ADMIN_NAME", "Northern Zone Traffic Controller")
+
+    existing = db.query(User).filter(
+        (User.username == admin_username) | (User.email == admin_email)
+    ).first()
+
+    if not existing:
+        ctrl = User(
+            username=admin_username,
+            railway_id="123456789012",
+            email=admin_email,
+            full_name=admin_name,
+            hashed_password=hash_pw(admin_password),
+            role="controller",
+            is_active=True
+        )
+        db.add(ctrl)
+        db.commit()
+
+    existing_p = db.query(User).filter(
+        (User.username == "passenger") | (User.email == "passenger@railnirdeshak.in")
+    ).first()
+    if not existing_p:
+        p = User(
+            username="passenger",
+            railway_id="111122223333",
+            email="passenger@railnirdeshak.in",
+            full_name="Rajesh Sharma",
+            hashed_password=hash_pw("demo123"),
+            role="passenger",
+            is_active=True
+        )
+        db.add(p)
+        db.commit()
+
 def seed():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
@@ -18,6 +57,7 @@ def seed():
     try:
         # 1. Users with 12-Digit Railway Authority IDs & Bcrypt Hashed Passwords
         demo_user = User(
+            username="passenger",
             railway_id="111122223333",
             email="passenger@railnirdeshak.in",
             full_name="Rajesh Sharma",
@@ -26,6 +66,7 @@ def seed():
             is_active=True
         )
         controller_user = User(
+            username="controller",
             railway_id="123456789012",
             email="control@railnirdeshak.in",
             full_name="Northern Zone Controller",
@@ -34,6 +75,7 @@ def seed():
             is_active=True
         )
         admin_user = User(
+            username="admin",
             railway_id="987654321098",
             email="drm.admin@railnirdeshak.in",
             full_name="Divisional Railway Manager / Admin",

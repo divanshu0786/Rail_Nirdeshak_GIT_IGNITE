@@ -31,6 +31,8 @@ def upgrade_database_schema(eng):
                 if "username" not in cols:
                     conn.execute(text("ALTER TABLE users ADD COLUMN username VARCHAR"))
                     conn.execute(text("UPDATE users SET username = email WHERE username IS NULL"))
+                if "railway_id" not in cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN railway_id VARCHAR(12)"))
                 if "is_active" not in cols:
                     conn.execute(text("ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT 1"))
                     conn.execute(text("UPDATE users SET is_active = 1 WHERE is_active IS NULL"))

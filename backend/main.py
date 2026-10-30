@@ -746,7 +746,26 @@ if os.path.exists(frontend_dir):
 
 if __name__ == "__main__":
     import uvicorn
+    import socket
+
+    def is_port_available(h, p):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind((h, p))
+                return True
+            except OSError:
+                return False
+
     port = int(os.environ.get("PORT", 8000))
     host = os.environ.get("HOST", "0.0.0.0")
-    print(f"[Rail Nirdeshak] Launching on {host}:{port}")
+
+    if not is_port_available(host, port):
+        print(f"[Rail Nirdeshak] Port {port} is busy or restricted on this machine.")
+        for fallback_port in [8001, 8080, 5000, 8888]:
+            if is_port_available(host, fallback_port):
+                print(f"[Rail Nirdeshak] Automatically switching to available port {fallback_port}!")
+                port = fallback_port
+                break
+
+    print(f"[Rail Nirdeshak] Launching on http://localhost:{port} (bound to {host}:{port})")
     uvicorn.run(app, host=host, port=port)

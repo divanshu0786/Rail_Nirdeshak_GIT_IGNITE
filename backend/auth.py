@@ -149,6 +149,12 @@ def require_current_user(user: Optional[User] = Depends(get_current_user)) -> Us
 
 def require_controller_user(user: User = Depends(require_current_user)) -> User:
     """Require an authenticated user with Controller or Admin role."""
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     user_role = (user.role or "").strip().lower()
     if user_role not in ["controller", "admin"]:
         raise HTTPException(
@@ -159,6 +165,12 @@ def require_controller_user(user: User = Depends(require_current_user)) -> User:
 
 def require_admin_user(user: User = Depends(require_controller_user)) -> User:
     """Require an authenticated user with Admin privileges."""
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     user_role = (user.role or "").strip().lower()
     if user_role != "admin":
         raise HTTPException(

@@ -15,7 +15,7 @@ function resolveApiBase() {
   }
 
   // Local development dev servers (Vite 5173, Webpack 3000, Live Server 5500, etc.)
-  if ((hostname === "localhost" || hostname === "127.0.0.1") && port && !["8000", "10000"].includes(port)) {
+  if ((hostname === "localhost" || hostname === "127.0.0.1") && port && !["8000", "8001", "8080", "10000"].includes(port)) {
     return "http://127.0.0.1:8000";
   }
 
