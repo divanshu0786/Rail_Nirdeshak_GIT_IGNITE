@@ -17,6 +17,8 @@ class User(Base):
     full_name = Column(String, nullable=False)
     hashed_password = Column(String, nullable=False)
     role = Column(String, default="passenger") # "passenger", "controller", or "admin"
+    phone_number = Column(String(20), unique=True, index=True, nullable=True)
+    firebase_uid = Column(String(128), unique=True, index=True, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)

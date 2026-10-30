@@ -16,7 +16,10 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
+  <!-- Firebase JavaScript SDK (Compat for pure browser compatibility) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 </head>
 
 <body>
@@ -387,60 +390,93 @@
             </div>
           </div>
 
-          <!-- DIRECT MOBILE OTP AUTHENTICATION (Password column removed) -->
+          <!-- FIREBASE PHONE OTP 2FA AUTHENTICATION -->
           <form id="control-login-form" onsubmit="handleControlOtpSubmit(event)" class="control-auth-form" novalidate>
             <!-- Error message container -->
             <div id="control-login-error" class="control-auth-error hidden">
               <i class="fa-solid fa-triangle-exclamation"></i>
-              <span id="control-login-error-text">Please enter your Employee ID and Mobile Number.</span>
+              <span id="control-login-error-text">Please enter your 12-digit Railway ID.</span>
             </div>
 
-            <!-- Step 1: Employee ID & Mobile Number Input -->
+            <!-- Step 1: Officer 12-Digit Railway ID -->
             <div id="control-phone-step">
               <div class="form-group">
-                <label for="control-username"><i class="fa-solid fa-id-card"></i> 12-Digit Employee ID /
-                  Username</label>
+                <label for="control-railway-id"><i class="fa-solid fa-id-card"></i> 12-Digit Official Railway ID</label>
                 <div class="input-icon-wrap">
-                  <input type="text" id="control-username" required placeholder="Enter Employee ID (e.g. 123456789012)"
-                    autocomplete="off">
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label for="control-mobile-input"><i class="fa-solid fa-mobile-screen"></i> Registered Mobile
-                  Number</label>
-                <div class="input-phone-wrap">
-                  <span class="country-prefix">+91</span>
-                  <input type="tel" id="control-mobile-input" placeholder="Enter 10-digit mobile number" maxlength="10"
-                    pattern="[0-9]{10}" inputmode="numeric" required autocomplete="tel">
+                  <input
+                    type="text"
+                    id="control-railway-id"
+                    name="railway_id"
+                    required
+                    placeholder="Enter 12-digit Railway ID (e.g. 123456789012)"
+                    maxlength="12"
+                    pattern="[0-9]{12}"
+                    inputmode="numeric"
+                    autocomplete="username"
+                  >
                 </div>
               </div>
 
               <!-- Invisible reCAPTCHA container for Firebase Phone Auth -->
               <div id="recaptcha-container"></div>
 
-              <button type="button" id="btn-send-control-otp" class="btn btn-primary control-submit-btn"
-                onclick="sendControlOtp()">
-                <span id="send-otp-btn-text"><i class="fa-solid fa-paper-plane"></i> Send OTP to Mobile</span>
-                <span id="send-otp-btn-loader" class="hidden"><i class="fa-solid fa-circle-notch fa-spin"></i> Sending
-                  SMS...</span>
+              <button
+                type="button"
+                id="btn-send-control-otp"
+                class="btn btn-primary control-submit-btn"
+                onclick="sendControlPhoneVerification()"
+              >
+                <span id="send-otp-btn-text"><i class="fa-solid fa-paper-plane"></i> Verify Clearance &amp; Send SMS OTP</span>
+                <span id="send-otp-btn-loader" class="hidden"><i class="fa-solid fa-circle-notch fa-spin"></i> Checking Registry &amp; Sending SMS...</span>
               </button>
+
+              <!-- Quick Demo Credentials Helper for Verification -->
+              <div class="official-quick-credentials">
+                <div class="quick-cred-title"><i class="fa-solid fa-shield-halved"></i> Official Registry Demo Accounts:</div>
+                <div class="quick-cred-grid">
+                  <button type="button" class="quick-cred-btn" onclick="quickFillRailwayId('123456789012')">
+                    <strong>Zone Controller</strong>
+                    <code>123456789012</code>
+                    <small class="text-cyan">+91 ••••• •3210</small>
+                  </button>
+                  <button type="button" class="quick-cred-btn" onclick="quickFillRailwayId('987654321098')">
+                    <strong>DRM Admin</strong>
+                    <code>987654321098</code>
+                    <small class="text-cyan">+91 ••••• •3211</small>
+                  </button>
+                  <button type="button" class="quick-cred-btn test-reject" onclick="quickFillRailwayId('111122223333')" title="Test rejection of Passenger role">
+                    <strong>Passenger (Deny Test)</strong>
+                    <code>111122223333</code>
+                    <small class="text-danger">Access Denied</small>
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <!-- Step 2: OTP Verification Input (shown once SMS is sent) -->
+            <!-- Step 2: 6-Digit SMS OTP Verification (shown after SMS is sent) -->
             <div id="control-verify-step" class="hidden mt-3">
               <div id="otp-sent-banner" class="otp-sent-banner">
                 <i class="fa-solid fa-comment-sms"></i>
-                <span id="otp-sent-banner-text">OTP has been sent to your mobile phone via SMS. Please check your
-                  messages.</span>
+                <div>
+                  <span id="otp-sent-banner-text">OTP sent to registered official mobile: <strong id="ctrl-masked-phone">+91 ••••• •3210</strong></span>
+                  <div class="text-muted" style="font-size:0.75rem; margin-top:0.25rem;">
+                    Officer: <span id="ctrl-officer-banner-name">Northern Zone Controller</span> (<span id="ctrl-officer-banner-role">controller</span>)
+                  </div>
+                </div>
               </div>
 
               <div class="form-group mt-3">
-                <label for="control-otp-code"><i class="fa-solid fa-key"></i> Enter 6-Digit OTP Received on
-                  Mobile</label>
+                <label for="control-otp-code"><i class="fa-solid fa-key"></i> Enter 6-Digit OTP Received on Mobile</label>
                 <div class="input-icon-wrap">
-                  <input type="text" id="control-otp-code" placeholder="Enter 6-digit OTP from SMS" maxlength="6"
-                    pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code">
+                  <input
+                    type="text"
+                    id="control-otp-code"
+                    placeholder="Enter 6-digit SMS OTP"
+                    maxlength="6"
+                    pattern="[0-9]{6}"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                  >
                 </div>
               </div>
 
@@ -450,21 +486,18 @@
               </div>
 
               <button type="submit" id="btn-verify-control-otp" class="btn btn-primary control-submit-btn">
-                <span id="verify-otp-btn-text"><i class="fa-solid fa-circle-check"></i> Verify &amp; Access
-                  Console</span>
-                <span id="verify-otp-btn-loader" class="hidden"><i class="fa-solid fa-circle-notch fa-spin"></i>
-                  Verifying...</span>
+                <span id="verify-otp-btn-text"><i class="fa-solid fa-circle-check"></i> Verify OTP &amp; Enter Console</span>
+                <span id="verify-otp-btn-loader" class="hidden"><i class="fa-solid fa-circle-notch fa-spin"></i> Verifying with Firebase Admin...</span>
               </button>
 
               <div class="otp-resend-row mt-3">
                 <span class="text-muted" id="otp-timer-text">Resend SMS in <b id="otp-countdown">30</b>s</span>
-                <button type="button" id="btn-resend-otp" class="btn-link hidden" onclick="sendControlOtp()">Resend
-                  OTP</button>
+                <button type="button" id="btn-resend-otp" class="btn-link hidden" onclick="sendControlPhoneVerification()">Resend OTP</button>
               </div>
 
               <div class="otp-back-row mt-3">
                 <button type="button" class="btn-back-pw" onclick="resetToPhoneStep()">
-                  <i class="fa-solid fa-arrow-left"></i> Change Mobile Number / ID
+                  <i class="fa-solid fa-arrow-left"></i> Change Railway ID
                 </button>
               </div>
             </div>
@@ -472,12 +505,10 @@
 
           <div class="control-auth-footer">
             <div class="security-notice">
-              <i class="fa-solid fa-fingerprint"></i> End-to-end 2FA authenticated session. An SMS OTP will be
-              dispatched to your authorized mobile device.
+              <i class="fa-solid fa-fingerprint"></i> Two-Factor Authenticated Session (2FA). SMS OTP is dispatched directly to the official mobile number on railway registry records via Firebase.
             </div>
             <div class="demo-credentials-hint">
-              <i class="fa-solid fa-circle-info text-cyan"></i> Control Access: Enter your 12-digit Employee ID and
-              Mobile Number to receive SMS OTP.
+              <i class="fa-solid fa-circle-info text-cyan"></i> Official Security: Enter your 12-digit Railway ID to verify permissions and receive SMS OTP.
             </div>
           </div>
         </div>
@@ -698,29 +729,7 @@
 
   <!-- Scripts -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "firebase/app";
-  import { getAnalytics } from "firebase/analytics";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
-
-  // Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-  const firebaseConfig = {
-  apiKey: "AIzaSyCf0ljc0-ppBcwhh8gXEeHAWP-wSQGLjmg",
-  authDomain: "rail-nirdeshak.firebaseapp.com",
-  projectId: "rail-nirdeshak",
-  storageBucket: "rail-nirdeshak.firebasestorage.app",
-  messagingSenderId: "724629020533",
-  appId: "1:724629020533:web:e1f98f8e9bb42e37d9bd3c",
-  measurementId: "G-PVVWQEPLXT"
-  };
-
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
-
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=6"></script>
 </body>
 
 </html>

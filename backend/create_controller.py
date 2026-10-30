@@ -16,7 +16,7 @@ from database import SessionLocal, engine, Base, upgrade_database_schema
 import models
 from auth import hash_password
 
-def provision_user(username: str, password: str, role: str = "controller", email: str = None, full_name: str = None, railway_id: str = None):
+def provision_user(username: str, password: str, role: str = "controller", email: str = None, full_name: str = None, railway_id: str = None, phone_number: str = None):
     upgrade_database_schema(engine)
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
@@ -37,14 +37,17 @@ def provision_user(username: str, password: str, role: str = "controller", email
                 existing.full_name = full_name
             if railway_id:
                 existing.railway_id = railway_id
+            if phone_number:
+                existing.phone_number = phone_number
             db.commit()
-            print(f"[SUCCESS] Updated existing user '{existing.username}' with role '{role}' and new password.")
+            print(f"[SUCCESS] Updated existing user '{existing.username}' with role '{role}', phone '{existing.phone_number}', and new password.")
             return
 
         user = models.User(
             username=username,
             railway_id=railway_id or "123456789012",
             email=email or f"{username}@railnirdeshak.in",
+            phone_number=phone_number or "+919876543210",
             full_name=full_name or f"{username.capitalize()} Officer",
             hashed_password=hash_password(password),
             role=role,
@@ -52,7 +55,7 @@ def provision_user(username: str, password: str, role: str = "controller", email
         )
         db.add(user)
         db.commit()
-        print(f"[SUCCESS] Created authorized {role} account: '{username}' (ID: {user.id})")
+        print(f"[SUCCESS] Created authorized {role} account: '{username}' (ID: {user.id}, Phone: {user.phone_number})")
 
     except Exception as e:
         db.rollback()
@@ -69,6 +72,7 @@ def main():
     parser.add_argument("--email", "-e", type=str, help="Official Email Address")
     parser.add_argument("--name", "-n", type=str, help="Full Name of the official")
     parser.add_argument("--railway-id", type=str, help="12-digit Railway ID")
+    parser.add_argument("--phone", type=str, help="Official Phone Number (e.g. +919876543210)")
     parser.add_argument("--interactive", "-i", action="store_true", help="Interactive prompt")
 
     args = parser.parse_args()
@@ -87,12 +91,13 @@ def main():
         email = input("Enter Official Email (default: auto-generated): ").strip() or None
         name = input("Enter Full Name (default: auto-generated): ").strip() or None
         railway_id = input("Enter 12-digit Railway ID (default: 123456789012): ").strip() or None
+        phone = input("Enter Registered Mobile (default: +919876543210): ").strip() or None
 
-        provision_user(username, password, role, email, name, railway_id)
+        provision_user(username, password, role, email, name, railway_id, phone)
     else:
         if not args.username or not args.password:
             parser.error("Both --username and --password are required when not running interactively.")
-        provision_user(args.username, args.password, args.role, args.email, args.name, args.railway_id)
+        provision_user(args.username, args.password, args.role, args.email, args.name, args.railway_id, args.phone)
 
 if __name__ == "__main__":
     main()

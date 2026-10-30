@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Tuple
 import jwt
 import hashlib
 import bcrypt
-from fastapi import Depends, HTTPException, status, Header, Query
+from fastapi import Depends, HTTPException, status, Header, Query, Request, Cookie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from database import get_db
@@ -99,18 +99,42 @@ def decode_access_token(token: str) -> Optional[dict]:
     except Exception:
         return None
 
+# ----------------- SESSION COOKIE UTILITIES -----------------
+def set_session_cookie(response, token: str) -> None:
+    """Set secure, HttpOnly session cookie to protect against XSS and session fixation."""
+    is_production = os.getenv("ENVIRONMENT", "").lower() == "production"
+    response.set_cookie(
+        key="rn_session",
+        value=token,
+        httponly=True,
+        secure=is_production,
+        samesite="lax",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/"
+    )
+
+def clear_session_cookie(response) -> None:
+    """Clear session cookie upon logout."""
+    response.delete_cookie(key="rn_session", path="/")
+
 # ----------------- AUTHENTICATION DEPENDENCIES -----------------
 def get_current_user(
+    request: Request = None,
     authorization: Optional[str] = Header(None),
     token: Optional[str] = Query(None),
+    rn_session: Optional[str] = Cookie(None),
     db: Session = Depends(get_db)
 ) -> Optional[User]:
-    """Extract user from Authorization Bearer header or ?token= query parameter."""
+    """Extract user from Authorization Bearer header, rn_session cookie, or ?token= query parameter."""
     raw_token = None
-    if authorization and authorization.startswith("Bearer "):
+    if authorization and isinstance(authorization, str) and authorization.startswith("Bearer "):
         raw_token = authorization.replace("Bearer ", "").strip()
-    elif token:
+    elif token and isinstance(token, str):
         raw_token = token.strip()
+    elif rn_session and isinstance(rn_session, str):
+        raw_token = rn_session.strip()
+    elif request and hasattr(request, "cookies") and request.cookies.get("rn_session"):
+        raw_token = request.cookies.get("rn_session").strip()
 
     if not raw_token:
         return None

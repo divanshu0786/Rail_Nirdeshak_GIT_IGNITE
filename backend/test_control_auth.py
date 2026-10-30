@@ -1,3 +1,4 @@
+from unittest.mock import MagicMock
 """
 Rail Nirdeshak - Control Room Security & Role-Based Access Control Verification Suite
 Direct verification of all 10 security requirements from the Master Development Prompt.
@@ -198,7 +199,7 @@ def run_tests():
         # Test 15: Session Logout
         # -------------------------------------------------------------
         print("\n[Test 15] Controller Logout...")
-        logout_res = logout(user=ctrl_user)
+        logout_res = logout(response=MagicMock(), user=ctrl_user)
         assert logout_res["status"] == "success"
         print("  ✓ PASS: Logout successfully executed.")
 

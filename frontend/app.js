@@ -117,6 +117,40 @@ async function initAuth() {
       console.warn("Auth check error:", e);
     }
   }
+
+  // Validate controller session or HttpOnly cookie
+  if (state.controllerToken && state.controllerToken !== "cookie_session") {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/me`, {
+        headers: { "Authorization": `Bearer ${state.controllerToken}` },
+        credentials: "include"
+      });
+      if (res.ok) {
+        state.controllerUser = await res.json();
+        localStorage.setItem("rn_ctrl_user", JSON.stringify(state.controllerUser));
+      } else {
+        state.controllerToken = null;
+        state.controllerUser = null;
+        localStorage.removeItem("rn_ctrl_token");
+        localStorage.removeItem("rn_ctrl_user");
+      }
+    } catch (e) {
+      console.warn("Controller session validation error:", e);
+    }
+  } else {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/me`, {
+        credentials: "include"
+      });
+      if (res.ok) {
+        const u = await res.json();
+        if (u && (u.role === "controller" || u.role === "admin")) {
+          state.controllerUser = u;
+          state.controllerToken = "cookie_session";
+        }
+      }
+    } catch (_) { }
+  }
 }
 
 function updateUserUI() {
@@ -1246,14 +1280,113 @@ function checkControlRoomAccess() {
       try { state.controlWs.close(); } catch (_) { }
       state.controlWs = null;
     }
-    const usernameInput = document.getElementById("control-username");
-    if (usernameInput) setTimeout(() => usernameInput.focus(), 150);
+    const railwayIdInput = document.getElementById("control-railway-id");
+    if (railwayIdInput) setTimeout(() => railwayIdInput.focus(), 150);
   }
 }
 
-// ----------------- CONTROL ROOM DIRECT MOBILE OTP AUTH -----------------
+// ----------------- CONTROL ROOM FIREBASE PHONE OTP 2FA AUTH -----------------
 let otpTimerInterval = null;
 let isControlOtpSending = false;
+
+function getFirebaseConfig() {
+  if (state.config && state.config.firebase && state.config.firebase.apiKey) {
+    return state.config.firebase;
+  }
+  return {
+    apiKey: "AIzaSyCf0ljc0-ppBcwhh8gXEeHAWP-wSQGLjmg",
+    authDomain: "rail-nirdeshak.firebaseapp.com",
+    projectId: "rail-nirdeshak",
+    storageBucket: "rail-nirdeshak.appspot.com",
+    messagingSenderId: "724629020533",
+    appId: "1:724629020533:web:e1f98f8e9bb42e37d9bd3c"
+  };
+}
+
+function initFirebaseClient() {
+  if (typeof firebase === "undefined") {
+    console.error("[Firebase] Firebase Compat SDK is not available in window.");
+    return null;
+  }
+  if (!firebase.apps || firebase.apps.length === 0) {
+    const config = getFirebaseConfig();
+    try {
+      firebase.initializeApp(config);
+      console.log("[Firebase] Initialized Firebase App for project:", config.projectId);
+    } catch (e) {
+      console.error("[Firebase] Initialization error:", e);
+    }
+  }
+  return firebase.auth();
+}
+
+function getControlRecaptchaVerifier() {
+  if (window.controlRecaptchaVerifier) {
+    return window.controlRecaptchaVerifier;
+  }
+  if (typeof firebase === "undefined") return null;
+
+  initFirebaseClient();
+
+  const container = document.getElementById("recaptcha-container");
+  if (!container) return null;
+
+  try {
+    window.controlRecaptchaVerifier = new firebase.auth.RecaptchaVerifier("recaptcha-container", {
+      size: "invisible",
+      callback: () => {
+        console.log("[Firebase Auth] reCAPTCHA solved");
+      },
+      "expired-callback": () => {
+        console.warn("[Firebase Auth] reCAPTCHA expired, resetting");
+        if (window.controlRecaptchaVerifier) {
+          try {
+            window.controlRecaptchaVerifier.render().then((widgetId) => {
+              if (typeof grecaptcha !== "undefined") grecaptcha.reset(widgetId);
+            });
+          } catch (_) { }
+        }
+      }
+    });
+    return window.controlRecaptchaVerifier;
+  } catch (err) {
+    console.error("[Firebase Auth] RecaptchaVerifier creation error:", err);
+    return null;
+  }
+}
+
+function quickFillRailwayId(id) {
+  const input = document.getElementById("control-railway-id");
+  if (input) {
+    input.value = id;
+    input.focus();
+  }
+  hideControlLoginError();
+}
+
+function showControlLoginError(msg) {
+  const errBox = document.getElementById("control-login-error");
+  const errText = document.getElementById("control-login-error-text");
+  if (errText) errText.textContent = msg;
+  if (errBox) errBox.classList.remove("hidden");
+}
+
+function hideControlLoginError() {
+  const errBox = document.getElementById("control-login-error");
+  if (errBox) errBox.classList.add("hidden");
+}
+
+function showControlOtpError(msg) {
+  const errBox = document.getElementById("control-otp-error");
+  const errText = document.getElementById("control-otp-error-text");
+  if (errText) errText.textContent = msg;
+  if (errBox) errBox.classList.remove("hidden");
+}
+
+function hideControlOtpError() {
+  const errBox = document.getElementById("control-otp-error");
+  if (errBox) errBox.classList.add("hidden");
+}
 
 function resetToPhoneStep() {
   if (otpTimerInterval) {
@@ -1264,26 +1397,26 @@ function resetToPhoneStep() {
 
   const phoneStep = document.getElementById("control-phone-step");
   const verifyStep = document.getElementById("control-verify-step");
-  const loginError = document.getElementById("control-login-error");
-  const otpError = document.getElementById("control-otp-error");
   const otpInput = document.getElementById("control-otp-code");
   const sendBtn = document.getElementById("btn-send-control-otp");
   const btnText = document.getElementById("send-otp-btn-text");
   const btnLoader = document.getElementById("send-otp-btn-loader");
 
+  hideControlLoginError();
+  hideControlOtpError();
+
   if (phoneStep) phoneStep.classList.remove("hidden");
   if (verifyStep) verifyStep.classList.add("hidden");
-  if (loginError) loginError.classList.add("hidden");
-  if (otpError) otpError.classList.add("hidden");
   if (otpInput) otpInput.value = "";
   if (sendBtn) sendBtn.disabled = false;
   if (btnLoader) btnLoader.classList.add("hidden");
   if (btnText) {
     btnText.classList.remove("hidden");
-    btnText.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Send OTP to Mobile`;
+    btnText.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Verify Clearance &amp; Send SMS OTP`;
   }
-  const mobileInput = document.getElementById("control-mobile-input");
-  if (mobileInput) setTimeout(() => mobileInput.focus(), 150);
+
+  const railwayIdInput = document.getElementById("control-railway-id");
+  if (railwayIdInput) setTimeout(() => railwayIdInput.focus(), 150);
 }
 
 // Backward compatibility alias
@@ -1291,127 +1424,115 @@ function switchBackToPasswordLogin() {
   resetToPhoneStep();
 }
 
-async function sendControlOtp() {
+async function sendControlPhoneVerification() {
   if (isControlOtpSending) return;
 
-  const usernameInput = document.getElementById("control-username");
-  const mobileInput = document.getElementById("control-mobile-input");
-  const loginError = document.getElementById("control-login-error");
-  const loginErrorText = document.getElementById("control-login-error-text");
+  hideControlLoginError();
+  hideControlOtpError();
+
+  const idInput = document.getElementById("control-railway-id");
+  const sendBtn = document.getElementById("btn-send-control-otp");
   const btnText = document.getElementById("send-otp-btn-text");
   const btnLoader = document.getElementById("send-otp-btn-loader");
-  const sendBtn = document.getElementById("btn-send-control-otp");
 
-  const rawUsername = (usernameInput ? usernameInput.value : "").trim();
-  const rawPhone = (mobileInput ? mobileInput.value : "").trim();
-  const phone = rawPhone.replace(/\D/g, "");
+  const railwayId = (idInput ? idInput.value : "").trim();
 
-  if (!rawUsername) {
-    if (loginError && loginErrorText) {
-      loginErrorText.textContent = "Please enter your 12-digit Employee ID / Username.";
-      loginError.classList.remove("hidden");
-    }
-    if (usernameInput) usernameInput.focus();
+  if (!railwayId || !/^\d{12}$/.test(railwayId)) {
+    showControlLoginError("Please enter a valid 12-digit Official Railway ID.");
+    if (idInput) idInput.focus();
     return;
   }
 
-  if (phone.length !== 10) {
-    if (loginError && loginErrorText) {
-      loginErrorText.textContent = "Please enter a valid 10-digit mobile number.";
-      loginError.classList.remove("hidden");
-    }
-    if (mobileInput) mobileInput.focus();
-    return;
-  }
-
-  if (loginError) loginError.classList.add("hidden");
-
-  // Lock the button during transmission
   isControlOtpSending = true;
+  if (sendBtn) sendBtn.disabled = true;
   if (btnText) btnText.classList.add("hidden");
   if (btnLoader) btnLoader.classList.remove("hidden");
-  if (sendBtn) sendBtn.disabled = true;
 
-  state.pendingControllerId = rawUsername;
-  window.simulatedControlPhone = phone;
+  try {
+    // 1. Verify Railway ID against trusted backend registry
+    const res = await fetch(`${API_BASE}/api/auth/request-phone-verification`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ railway_id: railwayId })
+    });
 
-  // In-memory verification backup (never displayed on screen)
-  const simulatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-  window.simulatedControlOtp = simulatedOtp;
+    const data = await res.json().catch(() => ({}));
 
-  let firebaseSent = false;
-  // Send REAL SMS to Mobile Phone via Firebase Phone Auth
-  if (typeof firebase !== "undefined" && typeof auth !== "undefined" && auth) {
-    try {
-      if (!window.recaptchaVerifier) {
-        window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier("recaptcha-container", {
-          size: "invisible",
-          callback: () => { }
-        });
-      }
-      const confirmationResult = await auth.signInWithPhoneNumber("+91" + phone, window.recaptchaVerifier);
-      window.controlConfirmationResult = confirmationResult;
-      firebaseSent = true;
-      console.log("[Firebase Phone Auth] Real SMS sent to +91" + phone);
-    } catch (fbErr) {
-      console.warn("[Firebase Phone Auth] Note:", fbErr.message || fbErr);
-      if (window.recaptchaVerifier) {
-        try { window.recaptchaVerifier.clear(); } catch (_) { }
-        window.recaptchaVerifier = null;
-      }
-    }
-  }
-
-  // Switch to OTP verification input inside the box
-  const phoneStep = document.getElementById("control-phone-step");
-  const verifyStep = document.getElementById("control-verify-step");
-  const bannerText = document.getElementById("otp-sent-banner-text");
-  const otpInput = document.getElementById("control-otp-code");
-
-  if (phoneStep) phoneStep.classList.add("hidden");
-  if (verifyStep) verifyStep.classList.remove("hidden");
-
-  // Show status notice without displaying the OTP on screen
-  if (bannerText) {
-    bannerText.innerHTML = `OTP has been dispatched to <strong>+91 ${phone}</strong> via SMS.<br><small style="color:var(--text-muted);">Please check your mobile phone messages and enter the 6-digit code.</small>`;
-  }
-
-  showToast(`SMS sent to +91 ${phone}. Please enter the OTP from your phone.`, "success");
-
-  if (otpInput) {
-    otpInput.value = "";
-    setTimeout(() => otpInput.focus(), 150);
-  }
-
-  startOtpCountdown();
-  startSendOtpLock();
-}
-
-function startSendOtpLock() {
-  let timeLeft = 60;
-  const btnText = document.getElementById("send-otp-btn-text");
-  const btnLoader = document.getElementById("send-otp-btn-loader");
-  const sendBtn = document.getElementById("btn-send-control-otp");
-
-  if (btnLoader) btnLoader.classList.add("hidden");
-  if (btnText) {
-    btnText.classList.remove("hidden");
-    btnText.innerHTML = `<i class="fa-solid fa-clock"></i> Resend in ${timeLeft}s`;
-  }
-
-  const lockInterval = setInterval(() => {
-    timeLeft--;
-    if (btnText) {
-      btnText.innerHTML = `<i class="fa-solid fa-clock"></i> Resend in ${timeLeft}s`;
-    }
-
-    if (timeLeft <= 0) {
-      clearInterval(lockInterval);
+    if (!res.ok) {
+      const errorMsg = data.detail || "Verification failed. Please check your Railway ID.";
+      showControlLoginError(errorMsg);
       isControlOtpSending = false;
       if (sendBtn) sendBtn.disabled = false;
-      if (btnText) btnText.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Send OTP to Mobile`;
+      if (btnText) btnText.classList.remove("hidden");
+      if (btnLoader) btnLoader.classList.add("hidden");
+      return;
     }
-  }, 1000);
+
+    // Backend returned authorized officer record and 10-minute session challenge
+    state.pendingChallenge = data;
+
+    // Update Step 2 banner
+    const maskedPhoneEl = document.getElementById("ctrl-masked-phone");
+    const officerNameEl = document.getElementById("ctrl-officer-banner-name");
+    const officerRoleEl = document.getElementById("ctrl-officer-banner-role");
+
+    if (maskedPhoneEl) maskedPhoneEl.textContent = data.masked_phone || data.phone_number;
+    if (officerNameEl) officerNameEl.textContent = data.officer_name || "Authorized Officer";
+    if (officerRoleEl) officerRoleEl.textContent = data.role || "controller";
+
+    // 2. Initiate Firebase Phone Authentication using the registered official phone number
+    const authInstance = initFirebaseClient();
+    if (!authInstance) {
+      throw new Error("Firebase Authentication SDK is not initialized. Please refresh.");
+    }
+
+    const appVerifier = getControlRecaptchaVerifier();
+    if (!appVerifier) {
+      throw new Error("Could not initialize reCAPTCHA security verifier.");
+    }
+
+    console.log(`[Firebase Phone Auth] Triggering SMS OTP for registered phone: ${data.phone_number}`);
+    const confirmationResult = await authInstance.signInWithPhoneNumber(data.phone_number, appVerifier);
+    window.controlConfirmationResult = confirmationResult;
+
+    // 3. Switch UI to Step 2: OTP verification
+    const phoneStep = document.getElementById("control-phone-step");
+    const verifyStep = document.getElementById("control-verify-step");
+    if (phoneStep) phoneStep.classList.add("hidden");
+    if (verifyStep) verifyStep.classList.remove("hidden");
+
+    showToast(`SMS OTP dispatched to registered mobile ${data.masked_phone}.`, "success");
+
+    const otpInput = document.getElementById("control-otp-code");
+    if (otpInput) {
+      otpInput.value = "";
+      setTimeout(() => otpInput.focus(), 150);
+    }
+
+    startOtpCountdown();
+  } catch (err) {
+    console.error("[Firebase Phone Auth] Dispatch Error:", err);
+    let msg = err.message || "Failed to dispatch SMS OTP.";
+    if (err.code === "auth/invalid-phone-number") {
+      msg = "Registered phone number is invalid for international SMS dispatch.";
+    } else if (err.code === "auth/quota-exceeded") {
+      msg = "SMS quota exceeded for today. Please contact system administrator.";
+    } else if (err.code === "auth/too-many-requests") {
+      msg = "Too many attempts from this IP. Please wait a few minutes before retrying.";
+    }
+    showControlLoginError(msg);
+
+    // Reset reCAPTCHA on failure so user can retry
+    if (window.controlRecaptchaVerifier) {
+      try { window.controlRecaptchaVerifier.clear(); } catch (_) { }
+      window.controlRecaptchaVerifier = null;
+    }
+  } finally {
+    isControlOtpSending = false;
+    if (sendBtn) sendBtn.disabled = false;
+    if (btnText) btnText.classList.remove("hidden");
+    if (btnLoader) btnLoader.classList.add("hidden");
+  }
 }
 
 function startOtpCountdown() {
@@ -1439,81 +1560,84 @@ function startOtpCountdown() {
 
 async function handleControlOtpSubmit(e) {
   e.preventDefault();
+  hideControlOtpError();
+
   const otpInput = document.getElementById("control-otp-code");
-  const otpError = document.getElementById("control-otp-error");
-  const otpErrorText = document.getElementById("control-otp-error-text");
   const btnText = document.getElementById("verify-otp-btn-text");
   const btnLoader = document.getElementById("verify-otp-btn-loader");
   const verifyBtn = document.getElementById("btn-verify-control-otp");
 
   const otp = (otpInput ? otpInput.value : "").trim();
-  if (otp.length !== 6) {
-    if (otpError) {
-      otpErrorText.textContent = "Please enter the 6-digit OTP code received on your mobile.";
-      otpError.classList.remove("hidden");
-    }
+  if (!otp || !/^\d{6}$/.test(otp)) {
+    showControlOtpError("Please enter the 6-digit SMS OTP received on your mobile.");
+    if (otpInput) otpInput.focus();
     return;
   }
 
-  if (otpError) otpError.classList.add("hidden");
+  if (!window.controlConfirmationResult || !state.pendingChallenge) {
+    showControlOtpError("OTP session expired or missing. Please change Railway ID and restart verification.");
+    return;
+  }
+
   if (btnText) btnText.classList.add("hidden");
   if (btnLoader) btnLoader.classList.remove("hidden");
   if (verifyBtn) verifyBtn.disabled = true;
 
-  let verified = false;
-  let sessionToken = "";
-  let sessionUser = null;
+  try {
+    // 1. Confirm OTP with Firebase client SDK
+    const userCredential = await window.controlConfirmationResult.confirm(otp);
+    const fbUser = userCredential.user;
 
-  // 1. Verify with Firebase SMS confirmationResult
-  if (window.controlConfirmationResult) {
-    try {
-      const userCred = await window.controlConfirmationResult.confirm(otp);
-      const fbUser = userCred.user;
-      sessionToken = await fbUser.getIdToken();
-      sessionUser = {
-        username: state.pendingControllerId || fbUser.phoneNumber || "controller",
-        full_name: "Station Controller (" + (fbUser.phoneNumber || "+91 " + (window.simulatedControlPhone || "")) + ")",
-        role: "controller",
-        phone: fbUser.phoneNumber || window.simulatedControlPhone
-      };
-      verified = true;
-    } catch (fbErr) {
-      console.warn("Firebase confirm error, checking local fallback:", fbErr);
+    // 2. Obtain real Firebase ID token
+    const idToken = await fbUser.getIdToken(true);
+
+    // 3. Submit Firebase ID token and challenge session ID to FastAPI backend
+    const res = await fetch(`${API_BASE}/api/auth/verify-firebase-session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        id_token: idToken,
+        session_id: state.pendingChallenge.session_id,
+        railway_id: state.pendingChallenge.railway_id
+      })
+    });
+
+    const result = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      const errDetail = result.detail || "Backend security check rejected session.";
+      showControlOtpError(errDetail);
+      return;
     }
-  }
 
-  // 2. Fallback validation against in-memory generated code or master code 123456
-  if (!verified) {
-    if (otp === window.simulatedControlOtp || otp === "123456") {
-      verified = true;
-      sessionToken = "otp_verified_" + Date.now();
-      sessionUser = {
-        username: state.pendingControllerId || "controller",
-        full_name: "Station Controller (+91 " + (window.simulatedControlPhone || "Verified") + ")",
-        role: "controller",
-        phone: window.simulatedControlPhone
-      };
-    }
-  }
+    // 4. Session established: store token & user info
+    state.controllerToken = result.access_token;
+    state.controllerUser = result.user;
+    localStorage.setItem("rn_ctrl_token", result.access_token);
+    localStorage.setItem("rn_ctrl_user", JSON.stringify(result.user));
 
-  if (btnText) btnText.classList.remove("hidden");
-  if (btnLoader) btnLoader.classList.add("hidden");
-  if (verifyBtn) verifyBtn.disabled = false;
+    showToast(`Access Granted: Welcome ${result.user.full_name} (${result.user.role.toUpperCase()})!`, "success");
 
-  if (verified && sessionUser) {
-    state.controllerToken = sessionToken;
-    state.controllerUser = sessionUser;
-    localStorage.setItem("rn_ctrl_token", sessionToken);
-    localStorage.setItem("rn_ctrl_user", JSON.stringify(sessionUser));
+    // Clean up temporary challenge state
+    state.pendingChallenge = null;
+    window.controlConfirmationResult = null;
 
-    showToast("Mobile OTP verified successfully! Access granted to Control Room.", "success");
     resetToPhoneStep();
     checkControlRoomAccess();
-  } else {
-    if (otpError) {
-      otpErrorText.textContent = "Invalid OTP code. Please check your SMS and enter the correct code.";
-      otpError.classList.remove("hidden");
+  } catch (err) {
+    console.error("[Firebase OTP Verify] Error:", err);
+    let msg = err.message || "Invalid or expired OTP code.";
+    if (err.code === "auth/invalid-verification-code") {
+      msg = "Invalid 6-digit OTP code. Please check your SMS and try again.";
+    } else if (err.code === "auth/code-expired") {
+      msg = "The OTP code has expired. Please click 'Resend OTP'.";
     }
+    showControlOtpError(msg);
+  } finally {
+    if (btnText) btnText.classList.remove("hidden");
+    if (btnLoader) btnLoader.classList.add("hidden");
+    if (verifyBtn) verifyBtn.disabled = false;
   }
 }
 
@@ -1539,16 +1663,24 @@ function toggleControlPasswordVisibility() {
 async function handleControlLogout() {
   const token = getControllerToken();
   try {
-    if (token) {
-      fetch(`${API_BASE}/api/auth/logout`, {
+    if (token && token !== "cookie_session") {
+      await fetch(`${API_BASE}/api/auth/logout`, {
         method: "POST",
+        credentials: "include",
         headers: { "Authorization": `Bearer ${token}` }
+      }).catch(() => { });
+    } else {
+      await fetch(`${API_BASE}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include"
       }).catch(() => { });
     }
   } catch (_) { }
 
   state.controllerToken = null;
   state.controllerUser = null;
+  state.pendingChallenge = null;
+  window.controlConfirmationResult = null;
   localStorage.removeItem("rn_ctrl_token");
   localStorage.removeItem("rn_ctrl_user");
 
@@ -1570,6 +1702,7 @@ async function handleControlLogout() {
   if (elField) elField.textContent = "0";
 
   showToast("Control Room console locked and logged out.", "info");
+  resetToPhoneStep();
   checkControlRoomAccess();
 }
 
@@ -1580,11 +1713,14 @@ async function loadControlRoom() {
   }
 
   const token = getControllerToken();
+  const headers = {};
+  if (token && token !== "cookie_session") {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
   try {
     const res = await fetch(`${API_BASE}/api/control-room/overview`, {
-      headers: {
-        "Authorization": `Bearer ${token}`
-      }
+      headers: headers,
+      credentials: "include"
     });
 
     if (res.status === 401 || res.status === 403) {
@@ -1654,14 +1790,16 @@ async function submitFieldObservation(e) {
   const delay = parseInt(document.getElementById("obs-delay").value, 10);
   const desc = document.getElementById("obs-desc").value;
   const token = getControllerToken();
+  const headers = { "Content-Type": "application/json" };
+  if (token && token !== "cookie_session") {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
 
   try {
     const res = await fetch(`${API_BASE}/api/field-observations`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
+      headers: headers,
+      credentials: "include",
       body: JSON.stringify({
         track_section: section,
         pole_reference: pole,
@@ -1695,7 +1833,8 @@ function connectControlWebSocket() {
   if (state.controlWs && state.controlWs.readyState === WebSocket.OPEN) return;
 
   const token = getControllerToken();
-  const ctrlWsUrl = `${WS_BASE}/ws/control-room?token=${encodeURIComponent(token)}`;
+  const tokenParam = (token && token !== "cookie_session") ? `?token=${encodeURIComponent(token)}` : "";
+  const ctrlWsUrl = `${WS_BASE}/ws/control-room${tokenParam}`;
   try {
     state.controlWs = new WebSocket(ctrlWsUrl);
     state.controlWs.onopen = () => {

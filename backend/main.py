@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from datetime import datetime
 from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, Query
+from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
@@ -23,8 +23,20 @@ from auth import (
     record_failed_attempt,
     is_rate_limited,
     clear_failed_attempts,
+    set_session_cookie,
+    clear_session_cookie,
+    validate_railway_id,
     SECRET_KEY,
     ALGORITHM
+)
+from firebase_service import (
+    is_phone_request_rate_limited,
+    record_phone_request_attempt,
+    create_phone_verification_session,
+    consume_phone_verification_session,
+    verify_firebase_id_token,
+    normalize_phone_number,
+    mask_phone_number
 )
 from eta_engine import calculate_dynamic_eta
 from websocket_manager import manager
@@ -81,7 +93,15 @@ def get_app_config():
         "google_maps_api_key": os.getenv("GOOGLE_MAPS_API_KEY", ""),
         "maptiler_api_key": os.getenv("MAPTILER_API_KEY", os.getenv("MAP_API_KEY", "")),
         "map_api_key": os.getenv("MAP_API_KEY", os.getenv("MAPTILER_API_KEY", "")),
-        "has_weather_api": bool(os.getenv("OPENWEATHERMAP_API_KEY"))
+        "has_weather_api": bool(os.getenv("OPENWEATHERMAP_API_KEY")),
+        "firebase": {
+            "apiKey": os.getenv("FIREBASE_API_KEY", "AIzaSyCf0ljc0-ppBcwhh8gXEeHAWP-wSQGLjmg"),
+            "authDomain": os.getenv("FIREBASE_AUTH_DOMAIN", "rail-nirdeshak.firebaseapp.com"),
+            "projectId": os.getenv("FIREBASE_PROJECT_ID", "rail-nirdeshak"),
+            "storageBucket": os.getenv("FIREBASE_STORAGE_BUCKET", "rail-nirdeshak.firebasestorage.app"),
+            "messagingSenderId": os.getenv("FIREBASE_MESSAGING_SENDER_ID", "724629020533"),
+            "appId": os.getenv("FIREBASE_APP_ID", "1:724629020533:web:e1f98f8e9bb42e37d9bd3c")
+        }
     }
 
 # ----------------- AUTHENTICATION -----------------
@@ -170,9 +190,181 @@ def login(creds: schemas.UserLogin, db: Session = Depends(get_db)):
     })
     return {"access_token": token, "token_type": "bearer", "user": user}
 
+# ----------------- FIREBASE PHONE OTP AUTHENTICATION -----------------
+
+@app.post("/api/auth/request-phone-verification", response_model=schemas.PhoneVerificationResponse)
+def request_phone_verification(req: schemas.PhoneVerificationRequest, request: Request, db: Session = Depends(get_db)):
+    """
+    Initiate Firebase Phone Authentication workflow:
+    1. Officer enters 12-digit Railway ID.
+    2. FastAPI validates Railway ID format and verifies against officer registry.
+    3. Verifies account is active and holds Controller or Admin clearance.
+    4. Retrieves registered trusted phone number from DB.
+    5. Returns single-use session challenge and masked phone for client Firebase auth.
+    """
+    import re
+    railway_id = (req.railway_id or "").strip()
+    if not re.fullmatch(r"^\d{12}$", railway_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please enter a valid 12-digit Railway ID (numeric only)."
+        )
+
+    # Rate limiting protection against SMS abuse
+    client_ip = request.client.host if request.client else "unknown"
+    rate_limited, wait_sec = is_phone_request_rate_limited(f"{client_ip}:{railway_id}")
+    if rate_limited:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many verification requests. Please wait {wait_sec} seconds before trying again."
+        )
+    record_phone_request_attempt(f"{client_ip}:{railway_id}")
+
+    # Query officer by 12-digit Railway ID
+    officer = db.query(models.User).filter(models.User.railway_id == railway_id).first()
+    if not officer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Official Railway ID not found in authorized personnel registry."
+        )
+
+    if not officer.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Officer account is currently deactivated. Please contact Division IT."
+        )
+
+    officer_role = (officer.role or "").strip().lower()
+    if officer_role not in ["controller", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Denied: Railway ID belongs to an unauthorized role (Passenger). Control Room access is restricted to Controllers and DRM Admins."
+        )
+
+    # Check registered phone number
+    raw_phone = officer.phone_number
+    if not raw_phone:
+        # Default fallback to configured official number
+        default_phone = os.getenv("CONTROLLER_PHONE_NUMBER", "+919876543210")
+        officer.phone_number = default_phone
+        db.commit()
+        db.refresh(officer)
+        raw_phone = officer.phone_number
+
+    phone = normalize_phone_number(raw_phone)
+    masked = mask_phone_number(phone)
+
+    # Create secure single-use session challenge (10-minute TTL)
+    session_id = create_phone_verification_session(railway_id, phone, officer.id)
+
+    return schemas.PhoneVerificationResponse(
+        session_id=session_id,
+        railway_id=officer.railway_id or railway_id,
+        masked_phone=masked,
+        phone_number=phone,
+        officer_name=officer.full_name,
+        role=officer.role,
+        expires_in=600
+    )
+
+
+@app.post("/api/auth/verify-firebase-session", response_model=schemas.TokenOut)
+def verify_firebase_session(req: schemas.FirebaseSessionVerifyRequest, response: Response, db: Session = Depends(get_db)):
+    """
+    Validate Firebase ID Token and finalize authenticated Control Room session:
+    1. Consumes single-use session challenge (anti-replay).
+    2. Verifies ID token with Firebase Admin SDK.
+    3. Matches verified Firebase phone number strictly against officer DB record.
+    4. Validates officer clearance (Controller or Admin).
+    5. Sets secure HttpOnly application session cookie and issues JWT access token.
+    """
+    railway_id = (req.railway_id or "").strip()
+    session_id = (req.session_id or "").strip()
+    id_token = (req.id_token or "").strip()
+
+    if not railway_id or not session_id or not id_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="id_token, session_id, and railway_id are required."
+        )
+
+    # 1. Consume session challenge (prevents replay attacks)
+    session_data = consume_phone_verification_session(session_id, railway_id)
+    if not session_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification challenge expired or invalid. Please request a new verification code."
+        )
+
+    # 2. Verify Firebase ID Token via Firebase Admin SDK
+    try:
+        decoded_token = verify_firebase_id_token(id_token)
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Firebase verification failed: {ve}"
+        )
+
+    firebase_phone = normalize_phone_number(decoded_token.get("phone_number", ""))
+    firebase_uid = decoded_token.get("uid")
+
+    if not firebase_phone:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Firebase ID token does not contain a verified phone number."
+        )
+
+    # 3. Lookup officer record in trusted database
+    officer = db.query(models.User).filter(models.User.railway_id == railway_id).first()
+    if not officer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Authorized officer record not found."
+        )
+
+    # 4. Strict phone number matching
+    expected_phone = normalize_phone_number(officer.phone_number or "")
+    if firebase_phone != expected_phone:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Security violation: Verified phone number ({firebase_phone}) does not match the registered official mobile number on file."
+        )
+
+    # 5. Verify role clearance
+    officer_role = (officer.role or "").strip().lower()
+    if officer_role not in ["controller", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Denied: Officer account does not have Controller clearance."
+        )
+
+    # 6. Update officer record with Firebase UID and last login
+    officer.firebase_uid = firebase_uid
+    officer.last_login = datetime.utcnow()
+    db.commit()
+    db.refresh(officer)
+
+    # 7. Generate application JWT access token
+    token = create_access_token({
+        "sub": str(officer.id),
+        "username": officer.username,
+        "railway_id": officer.railway_id,
+        "email": officer.email,
+        "role": officer.role,
+        "phone_number": officer.phone_number
+    })
+
+    # 8. Set secure HttpOnly application session cookie
+    set_session_cookie(response, token)
+
+    return {"access_token": token, "token_type": "bearer", "user": officer}
+
+
 @app.post("/auth/logout")
 @app.post("/api/auth/logout")
-def logout(user: Optional[models.User] = Depends(get_current_user)):
+def logout(response: Response, user: Optional[models.User] = Depends(get_current_user)):
+    if response:
+        clear_session_cookie(response)
     return {"status": "success", "message": "Logged out successfully."}
 
 @app.get("/auth/me", response_model=schemas.UserOut)
@@ -721,7 +913,9 @@ async def websocket_control_endpoint(
     db: Session = Depends(get_db)
 ):
     """Protected Control Room real-time WebSocket. Rejects unauthorized connections."""
-    user = verify_ws_token(token, db, required_roles=["controller", "admin"])
+    cookie_token = websocket.cookies.get("rn_session")
+    auth_token = token or cookie_token
+    user = verify_ws_token(auth_token, db, required_roles=["controller", "admin"])
     if not user:
         # Reject unauthenticated or non-controller connection
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Unauthorized or Forbidden")

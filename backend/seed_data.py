@@ -21,10 +21,12 @@ def seed_controller_if_missing(db):
     ).first()
 
     if not existing:
+        admin_phone = os.getenv("CONTROLLER_PHONE_NUMBER", "+919876543210")
         ctrl = User(
             username=admin_username,
             railway_id="123456789012",
             email=admin_email,
+            phone_number=admin_phone,
             full_name=admin_name,
             hashed_password=hash_pw(admin_password),
             role="controller",
@@ -60,6 +62,7 @@ def seed():
             username="passenger",
             railway_id="111122223333",
             email="passenger@railnirdeshak.in",
+            phone_number="+919876543299",
             full_name="Rajesh Sharma",
             hashed_password=hash_pw("demo123"),
             role="passenger",
@@ -69,8 +72,9 @@ def seed():
             username="controller",
             railway_id="123456789012",
             email="control@railnirdeshak.in",
+            phone_number=os.getenv("CONTROLLER_PHONE_NUMBER", "+919876543210"),
             full_name="Northern Zone Controller",
-            hashed_password=hash_pw("admin123"),
+            hashed_password=hash_pw("Admin@Rail2026!"),
             role="controller",
             is_active=True
         )
@@ -78,8 +82,9 @@ def seed():
             username="admin",
             railway_id="987654321098",
             email="drm.admin@railnirdeshak.in",
+            phone_number=os.getenv("ADMIN_PHONE_NUMBER", "+919876543211"),
             full_name="Divisional Railway Manager / Admin",
-            hashed_password=hash_pw("admin123"),
+            hashed_password=hash_pw("Admin@Rail2026!"),
             role="admin",
             is_active=True
         )

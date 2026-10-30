@@ -38,6 +38,10 @@ def upgrade_database_schema(eng):
                     conn.execute(text("UPDATE users SET is_active = 1 WHERE is_active IS NULL"))
                 if "last_login" not in cols:
                     conn.execute(text("ALTER TABLE users ADD COLUMN last_login DATETIME"))
+                if "phone_number" not in cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN phone_number VARCHAR(20)"))
+                if "firebase_uid" not in cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN firebase_uid VARCHAR(128)"))
                 conn.commit()
     except Exception:
         pass

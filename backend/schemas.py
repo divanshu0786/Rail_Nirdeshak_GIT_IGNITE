@@ -19,21 +19,43 @@ class RailwayIdLogin(BaseModel):
     railway_id: str
     password: str
 
+class PhoneVerificationRequest(BaseModel):
+    railway_id: str
+
+class PhoneVerificationResponse(BaseModel):
+    session_id: str
+    railway_id: Optional[str] = None
+    masked_phone: str
+    phone_number: str
+    officer_name: str
+    role: str
+    expires_in: int = 600
+
+class FirebaseSessionVerifyRequest(BaseModel):
+    id_token: str
+    session_id: str
+    railway_id: str
+
 class ControllerCreate(BaseModel):
     railway_id: str
     email: str
     full_name: str
     password: str
+    phone_number: Optional[str] = None
     role: Optional[str] = "controller"
 
 class UserOut(BaseModel):
     id: int
+    username: Optional[str] = None
     railway_id: Optional[str] = None
     email: str
     full_name: str
     role: str
+    phone_number: Optional[str] = None
+    firebase_uid: Optional[str] = None
     is_active: bool = True
     created_at: datetime
+    last_login: Optional[datetime] = None
 
     class Config:
         from_attributes = True
