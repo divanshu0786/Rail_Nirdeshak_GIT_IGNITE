@@ -20,6 +20,26 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+def upgrade_database_schema(eng):
+    """Ensure database schema is up-to-date with User columns (username, is_active, last_login)."""
+    from sqlalchemy import text
+    try:
+        with eng.connect() as conn:
+            result = conn.execute(text("PRAGMA table_info(users)"))
+            cols = [row[1] for row in result.fetchall()]
+            if cols:
+                if "username" not in cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN username VARCHAR"))
+                    conn.execute(text("UPDATE users SET username = email WHERE username IS NULL"))
+                if "is_active" not in cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT 1"))
+                    conn.execute(text("UPDATE users SET is_active = 1 WHERE is_active IS NULL"))
+                if "last_login" not in cols:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN last_login DATETIME"))
+                conn.commit()
+    except Exception:
+        pass
+
 def get_db():
     db = SessionLocal()
     try:

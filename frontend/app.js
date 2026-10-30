@@ -31,6 +31,11 @@ const WS_BASE = API_BASE.startsWith("https://")
 let state = {
   user: null,
   token: localStorage.getItem("rn_token") || null,
+  controllerToken: localStorage.getItem("rn_ctrl_token") || null,
+  controllerUser: (() => {
+    try { return JSON.parse(localStorage.getItem("rn_ctrl_user") || "null"); } catch (_) { return null; }
+  })(),
+  controlWs: null,
   allTrains: [],
   currentTrain: null,
   savedTrains: [],
@@ -50,7 +55,6 @@ document.addEventListener("DOMContentLoaded", () => {
   loadAppConfig();
   initAuth();
   loadInitialTrains();
-  loadControlRoom();
   setupSearchDropdown();
   setupStationAutocomplete();
 });
@@ -91,7 +95,7 @@ function switchTab(tabId) {
   } else if (tabId === "saved") {
     loadSavedTrains();
   } else if (tabId === "control") {
-    loadControlRoom();
+    checkControlRoomAccess();
   }
 }
 
@@ -1199,10 +1203,192 @@ async function removeSavedTrain(trainId) {
   }
 }
 
-// ----------------- CONTROL ROOM -----------------
-async function loadControlRoom() {
+// ----------------- CONTROL ROOM AUTH & MANAGEMENT -----------------
+function isControllerAuthenticated() {
+  if (!state.controllerToken || !state.controllerUser) return false;
+  const role = (state.controllerUser.role || "").toLowerCase();
+  return role === "controller" || role === "admin";
+}
+
+function checkControlRoomAccess() {
+  const gate = document.getElementById("control-auth-gate");
+  const dash = document.getElementById("control-dashboard-view");
+
+  if (isControllerAuthenticated()) {
+    if (gate) gate.classList.add("hidden");
+    if (dash) dash.classList.remove("hidden");
+    const userBadge = document.getElementById("ctrl-logged-in-user");
+    const roleBadge = document.getElementById("ctrl-logged-in-role");
+    if (userBadge) userBadge.textContent = state.controllerUser.full_name || state.controllerUser.username;
+    if (roleBadge) roleBadge.textContent = state.controllerUser.role || "controller";
+    loadControlRoom();
+    connectControlWebSocket();
+  } else {
+    if (gate) gate.classList.remove("hidden");
+    if (dash) dash.classList.add("hidden");
+    if (state.controlWs) {
+      try { state.controlWs.close(); } catch (_) {}
+      state.controlWs = null;
+    }
+    const usernameInput = document.getElementById("control-username");
+    if (usernameInput) setTimeout(() => usernameInput.focus(), 150);
+  }
+}
+
+async function handleControlLogin(e) {
+  e.preventDefault();
+  const usernameInput = document.getElementById("control-username");
+  const passwordInput = document.getElementById("control-password");
+  const errorBox = document.getElementById("control-login-error");
+  const errorText = document.getElementById("control-login-error-text");
+  const btnText = document.getElementById("control-btn-text");
+  const btnLoader = document.getElementById("control-btn-loader");
+  const submitBtn = document.getElementById("control-login-btn");
+
+  const username = (usernameInput ? usernameInput.value : "").trim();
+  const password = (passwordInput ? passwordInput.value : "").trim();
+
+  if (!username || !password) {
+    if (errorBox) {
+      errorText.textContent = "Please enter both username and password.";
+      errorBox.classList.remove("hidden");
+    }
+    return;
+  }
+
+  // Show loading indicator
+  if (errorBox) errorBox.classList.add("hidden");
+  if (btnText) btnText.classList.add("hidden");
+  if (btnLoader) btnLoader.classList.remove("hidden");
+  if (submitBtn) submitBtn.disabled = true;
+
   try {
-    const res = await fetch(`${API_BASE}/api/control-room/overview`);
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      const msg = data.detail || "Invalid username or password. Please try again.";
+      if (errorBox) {
+        errorText.textContent = msg;
+        errorBox.classList.remove("hidden");
+      }
+      return;
+    }
+
+    // Role-based authorization verification: Must be controller or admin!
+    const role = (data.user && data.user.role ? data.user.role : "").toLowerCase();
+    if (role !== "controller" && role !== "admin") {
+      if (errorBox) {
+        errorText.textContent = "Access Denied: Your account does not have Controller or Administrator privileges.";
+        errorBox.classList.remove("hidden");
+      }
+      return;
+    }
+
+    // Save authorized controller session
+    state.controllerToken = data.access_token;
+    state.controllerUser = data.user;
+    localStorage.setItem("rn_ctrl_token", data.access_token);
+    localStorage.setItem("rn_ctrl_user", JSON.stringify(data.user));
+
+    // Reset password field
+    if (passwordInput) passwordInput.value = "";
+
+    showToast(`Access Granted. Welcome, ${data.user.full_name || data.user.username}!`, "success");
+    checkControlRoomAccess();
+
+  } catch (err) {
+    console.error("Control Room auth error:", err);
+    if (errorBox) {
+      errorText.textContent = "Authentication request failed. Please check server connectivity.";
+      errorBox.classList.remove("hidden");
+    }
+  } finally {
+    if (btnText) btnText.classList.remove("hidden");
+    if (btnLoader) btnLoader.classList.add("hidden");
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+function toggleControlPasswordVisibility() {
+  const pwInput = document.getElementById("control-password");
+  const eyeIcon = document.getElementById("control-pw-eye");
+  if (!pwInput) return;
+  if (pwInput.type === "password") {
+    pwInput.type = "text";
+    if (eyeIcon) {
+      eyeIcon.classList.remove("fa-eye");
+      eyeIcon.classList.add("fa-eye-slash");
+    }
+  } else {
+    pwInput.type = "password";
+    if (eyeIcon) {
+      eyeIcon.classList.remove("fa-eye-slash");
+      eyeIcon.classList.add("fa-eye");
+    }
+  }
+}
+
+async function handleControlLogout() {
+  try {
+    if (state.controllerToken) {
+      fetch(`${API_BASE}/api/auth/logout`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${state.controllerToken}` }
+      }).catch(() => {});
+    }
+  } catch (_) {}
+
+  state.controllerToken = null;
+  state.controllerUser = null;
+  localStorage.removeItem("rn_ctrl_token");
+  localStorage.removeItem("rn_ctrl_user");
+
+  if (state.controlWs) {
+    try { state.controlWs.close(); } catch (_) {}
+    state.controlWs = null;
+  }
+
+  // Clear rendered dashboard tables and KPIs
+  const tbody = document.getElementById("control-trains-tbody");
+  if (tbody) tbody.innerHTML = "<tr><td colspan='8' class='text-center text-muted py-4'><i class='fa-solid fa-lock'></i> Console locked. Authenticate to view live telemetry.</td></tr>";
+  const elActive = document.getElementById("kpi-active-trains");
+  const elDelayed = document.getElementById("kpi-delayed-trains");
+  const elProp = document.getElementById("kpi-prop-risks");
+  const elField = document.getElementById("kpi-field-alerts");
+  if (elActive) elActive.textContent = "0";
+  if (elDelayed) elDelayed.textContent = "0";
+  if (elProp) elProp.textContent = "0";
+  if (elField) elField.textContent = "0";
+
+  showToast("Control Room console locked and logged out.", "info");
+  checkControlRoomAccess();
+}
+
+async function loadControlRoom() {
+  if (!isControllerAuthenticated()) {
+    checkControlRoomAccess();
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/control-room/overview`, {
+      headers: {
+        "Authorization": `Bearer ${state.controllerToken}`
+      }
+    });
+
+    if (res.status === 401 || res.status === 403) {
+      showToast("Control session expired or unauthorized. Please sign in again.", "danger");
+      handleControlLogout();
+      return;
+    }
+
     if (res.ok) {
       state.controlData = await res.json();
       renderControlRoom(state.controlData);
@@ -1215,12 +1401,18 @@ async function loadControlRoom() {
 function renderControlRoom(ctrl) {
   if (!ctrl) return;
 
-  document.getElementById("kpi-active-trains").textContent = ctrl.active_trains_count;
-  document.getElementById("kpi-delayed-trains").textContent = ctrl.delayed_trains_count;
-  document.getElementById("kpi-prop-risks").textContent = ctrl.high_risk_propagations;
-  document.getElementById("kpi-field-alerts").textContent = ctrl.active_field_alerts;
+  const elActive = document.getElementById("kpi-active-trains");
+  const elDelayed = document.getElementById("kpi-delayed-trains");
+  const elProp = document.getElementById("kpi-prop-risks");
+  const elField = document.getElementById("kpi-field-alerts");
+  if (elActive) elActive.textContent = ctrl.active_trains_count;
+  if (elDelayed) elDelayed.textContent = ctrl.delayed_trains_count;
+  if (elProp) elProp.textContent = ctrl.high_risk_propagations;
+  if (elField) elField.textContent = ctrl.active_field_alerts;
 
   const tbody = document.getElementById("control-trains-tbody");
+  if (!tbody) return;
+
   tbody.innerHTML = ctrl.trains.map(t => {
     const isPropHigh = t.propagation_risk === "HIGH";
     return `
@@ -1246,6 +1438,12 @@ function renderControlRoom(ctrl) {
 
 async function submitFieldObservation(e) {
   e.preventDefault();
+  if (!isControllerAuthenticated()) {
+    showToast("Authentication required to dispatch survey observations", "danger");
+    checkControlRoomAccess();
+    return;
+  }
+
   const section = document.getElementById("obs-section").value;
   const pole = document.getElementById("obs-pole").value;
   const type = document.getElementById("obs-type").value;
@@ -1255,7 +1453,10 @@ async function submitFieldObservation(e) {
   try {
     const res = await fetch(`${API_BASE}/api/field-observations`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${state.controllerToken}`
+      },
       body: JSON.stringify({
         track_section: section,
         pole_reference: pole,
@@ -1264,6 +1465,13 @@ async function submitFieldObservation(e) {
         description: desc
       })
     });
+
+    if (res.status === 401 || res.status === 403) {
+      showToast("Access forbidden: Controller privileges required", "danger");
+      handleControlLogout();
+      return;
+    }
+
     if (res.ok) {
       showToast("Survey observation logged & propagated across corridor!", "success");
       loadControlRoom();
@@ -1271,6 +1479,34 @@ async function submitFieldObservation(e) {
     }
   } catch (err) {
     showToast("Failed to dispatch survey observation", "danger");
+  }
+}
+
+function connectControlWebSocket() {
+  if (!isControllerAuthenticated()) return;
+  if (state.controlWs && state.controlWs.readyState === WebSocket.OPEN) return;
+
+  const ctrlWsUrl = `${WS_BASE}/ws/control-room?token=${encodeURIComponent(state.controllerToken)}`;
+  try {
+    state.controlWs = new WebSocket(ctrlWsUrl);
+    state.controlWs.onopen = () => {
+      console.log("Control Room telemetry WebSocket connected.");
+    };
+    state.controlWs.onmessage = (evt) => {
+      try {
+        const data = JSON.parse(evt.data);
+        if (data.type === "TELEMETRY_UPDATE" || data.type === "SIMULATION_STEP") {
+          loadControlRoom();
+        }
+      } catch (_) {}
+    };
+    state.controlWs.onclose = (evt) => {
+      if (evt.code === 1008) {
+        console.warn("Control WebSocket rejected: Unauthorized or Forbidden");
+      }
+    };
+  } catch (e) {
+    console.warn("Could not initiate control WebSocket:", e);
   }
 }
 

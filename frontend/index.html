@@ -318,6 +318,7 @@
         </div>
 
       </div>
+      </div>
     </section>
 
     <!-- ================= TAB 3: LIVE MAP ================= -->
@@ -352,7 +353,92 @@
 
     <!-- ================= TAB 5: CONTROL ROOM ================= -->
     <section id="tab-control" class="tab-pane">
-      <div class="container">
+
+      <!-- 1. RESTRICTED ACCESS GATE (Shown when unauthenticated or unauthorized) -->
+      <div id="control-auth-gate" class="control-auth-gate">
+        <div class="control-auth-card">
+          <div class="control-auth-header">
+            <div class="control-shield-icon">
+              <i class="fa-solid fa-tower-broadcast"></i>
+              <div class="shield-pulse-ring"></div>
+            </div>
+            <div class="control-brand-tag">Rail Nirdeshak</div>
+            <div class="control-brand-tagline">From Uncertain Arrivals to Informed Journey</div>
+            <h2 class="control-auth-title">Control Room Access</h2>
+            <div class="control-auth-badge">
+              <i class="fa-solid fa-shield-halved"></i> Authorized Personnel Only
+            </div>
+          </div>
+
+          <form id="control-login-form" onsubmit="handleControlLogin(event)" class="control-auth-form" novalidate>
+            <!-- Error message container -->
+            <div id="control-login-error" class="control-auth-error hidden">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+              <span id="control-login-error-text">Invalid username or password. Please try again.</span>
+            </div>
+
+            <!-- Username Field -->
+            <div class="form-group">
+              <label for="control-username"><i class="fa-solid fa-user-shield"></i> Controller Username or ID</label>
+              <div class="input-icon-wrap">
+                <input 
+                  type="text" 
+                  id="control-username" 
+                  required 
+                  placeholder="Enter controller username or ID" 
+                  autocomplete="username"
+                  autocapitalize="none"
+                >
+              </div>
+            </div>
+
+            <!-- Password Field -->
+            <div class="form-group">
+              <label for="control-password"><i class="fa-solid fa-lock"></i> Secure Password</label>
+              <div class="input-icon-wrap password-wrap">
+                <input 
+                  type="password" 
+                  id="control-password" 
+                  required 
+                  placeholder="Enter access password" 
+                  autocomplete="current-password"
+                >
+                <button type="button" class="btn-toggle-pw" onclick="toggleControlPasswordVisibility()" title="Show/Hide Password">
+                  <i class="fa-solid fa-eye" id="control-pw-eye"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" id="control-login-btn" class="btn btn-primary control-submit-btn">
+              <span id="control-btn-text"><i class="fa-solid fa-arrow-right-to-bracket"></i> Authenticate & Enter Console</span>
+              <span id="control-btn-loader" class="hidden"><i class="fa-solid fa-circle-notch fa-spin"></i> Verifying Credentials...</span>
+            </button>
+          </form>
+
+          <div class="control-auth-footer">
+            <div class="security-notice">
+              <i class="fa-solid fa-fingerprint"></i> End-to-end authenticated session. Unauthorized access attempts are monitored and recorded.
+            </div>
+            <div class="demo-credentials-hint">
+              <i class="fa-solid fa-circle-info text-cyan"></i> Demo Credentials: <code>controller</code> / <code>Admin@Rail2026!</code>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. AUTHORIZED CONTROL ROOM DASHBOARD (Only visible and loaded after successful login) -->
+      <div id="control-dashboard-view" class="control-dashboard-view hidden">
+        <div class="container">
+          <div class="control-top-bar">
+            <div class="ctrl-session-badge">
+              <i class="fa-solid fa-shield-check text-success"></i>
+              <span>Active Console: <strong id="ctrl-logged-in-user">Northern Zone Controller</strong> (<span id="ctrl-logged-in-role">controller</span>)</span>
+            </div>
+            <button type="button" class="btn-ctrl-logout" onclick="handleControlLogout()" title="Lock Control Room and Sign Out">
+              <i class="fa-solid fa-arrow-right-from-bracket"></i> Lock & Log Out
+            </button>
+          </div>
         <div class="control-header-bar">
           <div>
             <h2><i class="fa-solid fa-tower-broadcast text-danger"></i> Division Traffic Control & Propagation Room</h2>
