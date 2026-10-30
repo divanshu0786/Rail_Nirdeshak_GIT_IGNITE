@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,13 +9,16 @@
   <!-- Google Fonts: Inter & Outfit -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap"
+    rel="stylesheet">
   <!-- Leaflet CSS for Live Interactive Map -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="style.css?v=3">
 </head>
+
 <body>
   <!-- Header / Navigation Bar -->
   <header class="app-header">
@@ -54,14 +58,15 @@
 
   <!-- Main Content Viewport -->
   <main class="main-content">
-    
+
     <!-- ================= TAB 1: HOME ================= -->
     <section id="tab-home" class="tab-pane active">
       <div class="hero-section">
         <div class="hero-badge"><i class="fa-solid fa-sparkles"></i> AI-Powered Dynamic Railway ETA Prediction</div>
         <h1 class="hero-title">Know Exactly <span>When & Why</span> Your Train Arrives</h1>
         <p class="hero-desc">
-          Unlike static timetables or ordinary delay trackers, Rail Nirdeshak calculates evolving section delays, track headway risks, and physical survey observations in real time.
+          Unlike static timetables or ordinary delay trackers, Rail Nirdeshak calculates evolving section delays, track
+          headway risks, and physical survey observations in real time.
         </p>
 
         <!-- Dual Search Panel: Route Search (From/To) & Train No. Search -->
@@ -82,13 +87,15 @@
               <div class="station-field-wrap">
                 <label class="field-label"><i class="fa-solid fa-location-dot text-cyan"></i> FROM STATION</label>
                 <div class="input-with-icon">
-                  <input type="text" id="from-station-input" placeholder="Search origin station (e.g. Delhi, NDLS)..." autocomplete="off">
+                  <input type="text" id="from-station-input" placeholder="Search origin station (e.g. Delhi, NDLS)..."
+                    autocomplete="off">
                   <div id="from-station-dropdown" class="search-dropdown hidden"></div>
                 </div>
               </div>
 
               <!-- Swap Button -->
-              <button type="button" class="station-swap-btn" onclick="swapStations()" title="Swap origin and destination stations">
+              <button type="button" class="station-swap-btn" onclick="swapStations()"
+                title="Swap origin and destination stations">
                 <i class="fa-solid fa-right-left"></i>
               </button>
 
@@ -96,7 +103,8 @@
               <div class="station-field-wrap">
                 <label class="field-label"><i class="fa-solid fa-flag-checkered text-amber"></i> TO STATION</label>
                 <div class="input-with-icon">
-                  <input type="text" id="to-station-input" placeholder="Search destination (e.g. Amritsar, ASR)..." autocomplete="off">
+                  <input type="text" id="to-station-input" placeholder="Search destination (e.g. Amritsar, ASR)..."
+                    autocomplete="off">
                   <div id="to-station-dropdown" class="search-dropdown hidden"></div>
                 </div>
               </div>
@@ -120,7 +128,9 @@
           <div id="train-num-search-form" class="search-box-card hidden">
             <div class="search-input-group">
               <i class="fa-solid fa-magnifying-glass search-icon"></i>
-              <input type="text" id="train-search-input" placeholder="Enter Train Number or Name (e.g. 12497, Shane Punjab)..." autocomplete="off" onkeyup="handleSearchKey(event)">
+              <input type="text" id="train-search-input"
+                placeholder="Enter Train Number or Name (e.g. 12497, Shane Punjab)..." autocomplete="off"
+                onkeyup="handleSearchKey(event)">
               <button class="btn btn-primary" onclick="searchTrains()">
                 <i class="fa-solid fa-bolt"></i> Track Dynamic ETA
               </button>
@@ -132,7 +142,8 @@
           <div id="station-search-results-box" class="search-results-section hidden">
             <div class="results-header">
               <h3 id="search-results-title"><i class="fa-solid fa-train-subway"></i> Available Trains</h3>
-              <button class="btn btn-sm btn-outline" onclick="closeSearchResults()"><i class="fa-solid fa-xmark"></i> Close</button>
+              <button class="btn btn-sm btn-outline" onclick="closeSearchResults()"><i class="fa-solid fa-xmark"></i>
+                Close</button>
             </div>
             <div id="station-search-results-list" class="station-results-grid"></div>
           </div>
@@ -145,22 +156,26 @@
           <div class="feature-card">
             <div class="f-icon"><i class="fa-solid fa-calculator"></i></div>
             <h3>Dynamic Recalculation</h3>
-            <p>Calculates dynamic delay evolution for 3–5 upcoming stations based on physics, speed deficits, and scheduled buffers.</p>
+            <p>Calculates dynamic delay evolution for 3–5 upcoming stations based on physics, speed deficits, and
+              scheduled buffers.</p>
           </div>
           <div class="feature-card">
             <div class="f-icon"><i class="fa-solid fa-comment-dots"></i></div>
             <h3>Explainable Delay Breakdown</h3>
-            <p>Answers "Why did the ETA change?" with exact signal halt, section congestion, weather, and recovery margin breakdowns.</p>
+            <p>Answers "Why did the ETA change?" with exact signal halt, section congestion, weather, and recovery
+              margin breakdowns.</p>
           </div>
           <div class="feature-card">
             <div class="f-icon"><i class="fa-solid fa-network-wired"></i></div>
             <h3>Shared-Track Propagation</h3>
-            <p>Detects upstream headway delays affecting following trains along shared Northern Railway track sections.</p>
+            <p>Detects upstream headway delays affecting following trains along shared Northern Railway track sections.
+            </p>
           </div>
           <div class="feature-card">
             <div class="f-icon"><i class="fa-solid fa-location-crosshairs"></i></div>
             <h3>Track-Aware Pole Survey</h3>
-            <p>Integrates on-ground railway survey observations and physical pole markers (e.g., KM 42/18) with live telemetry.</p>
+            <p>Integrates on-ground railway survey observations and physical pole markers (e.g., KM 42/18) with live
+              telemetry.</p>
           </div>
         </div>
       </div>
@@ -169,7 +184,7 @@
     <!-- ================= TAB 2: TRACK DYNAMIC ETA ================= -->
     <section id="tab-track" class="tab-pane">
       <div class="container">
-        
+
         <!-- Train Summary Header Card -->
         <div class="train-hero-card" id="track-train-header">
           <div class="train-primary-info">
@@ -211,16 +226,17 @@
           <div class="alert-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
           <div class="alert-content">
             <h4>Shared-Track Headway Warning</h4>
-            <p id="propagation-alert-text">Preceding train on section NDLS-PNP-LINE1 is experiencing signal delays. High headway propagation risk predicted for upcoming stations.</p>
+            <p id="propagation-alert-text">Preceding train on section NDLS-PNP-LINE1 is experiencing signal delays. High
+              headway propagation risk predicted for upcoming stations.</p>
           </div>
         </div>
 
         <!-- Main Tracking Two-Column Layout -->
         <div class="tracking-grid mt-4">
-          
+
           <!-- Left Column: Dynamic ETA Predictions & Explainable Breakdown -->
           <div class="col-main">
-            
+
             <!-- Dynamic ETA for Upcoming 3-5 Stations -->
             <div class="card panel-card">
               <div class="panel-header">
@@ -275,7 +291,7 @@
 
           <!-- Right Column: Track Reference, Physical Surveys & Telemetry -->
           <div class="col-side">
-            
+
             <div class="card panel-card">
               <div class="panel-header">
                 <h3><i class="fa-solid fa-location-crosshairs text-purple"></i> Track-Aware Positioning</h3>
@@ -325,7 +341,8 @@
     <section id="tab-map" class="tab-pane">
       <div class="container-fluid map-container-wrapper">
         <div class="map-overlay-card">
-          <div class="map-overlay-title"><i class="fa-solid fa-satellite-dish text-amber"></i> Live Route Corridor Map</div>
+          <div class="map-overlay-title"><i class="fa-solid fa-satellite-dish text-amber"></i> Live Route Corridor Map
+          </div>
           <div class="map-overlay-sub" id="map-status-sub">Tracking Northern Railway Section (NDLS → ASR/KLK)</div>
           <div class="map-legend mt-2">
             <span class="legend-item"><span class="legend-dot green"></span> Live Train</span>
@@ -351,7 +368,7 @@
       </div>
     </section>
 
-        <!-- ================= TAB 5: CONTROL ROOM ================= -->
+    <!-- ================= TAB 5: CONTROL ROOM ================= -->
     <section id="tab-control" class="tab-pane">
 
       <!-- 1. RESTRICTED ACCESS GATE (Shown when unauthenticated or unauthorized) -->
@@ -370,58 +387,97 @@
             </div>
           </div>
 
-          <form id="control-login-form" onsubmit="handleControlLogin(event)" class="control-auth-form" novalidate>
+          <!-- DIRECT MOBILE OTP AUTHENTICATION (Password column removed) -->
+          <form id="control-login-form" onsubmit="handleControlOtpSubmit(event)" class="control-auth-form" novalidate>
             <!-- Error message container -->
             <div id="control-login-error" class="control-auth-error hidden">
               <i class="fa-solid fa-triangle-exclamation"></i>
-              <span id="control-login-error-text">Invalid username or password. Please try again.</span>
+              <span id="control-login-error-text">Please enter your Employee ID and Mobile Number.</span>
             </div>
 
-            <!-- Username Field -->
-            <div class="form-group">
-              <label for="control-username"><i class="fa-solid fa-user-shield"></i> Controller Username or ID</label>
-              <div class="input-icon-wrap">
-                <input 
-                  type="text" 
-                  id="control-username" 
-                  required 
-                  placeholder="Enter controller username or ID" 
-                  autocomplete="username"
-                  autocapitalize="none"
-                >
+            <!-- Step 1: Employee ID & Mobile Number Input -->
+            <div id="control-phone-step">
+              <div class="form-group">
+                <label for="control-username"><i class="fa-solid fa-id-card"></i> 12-Digit Employee ID /
+                  Username</label>
+                <div class="input-icon-wrap">
+                  <input type="text" id="control-username" required placeholder="Enter Employee ID (e.g. 123456789012)"
+                    autocomplete="off">
+                </div>
               </div>
+
+              <div class="form-group">
+                <label for="control-mobile-input"><i class="fa-solid fa-mobile-screen"></i> Registered Mobile
+                  Number</label>
+                <div class="input-phone-wrap">
+                  <span class="country-prefix">+91</span>
+                  <input type="tel" id="control-mobile-input" placeholder="Enter 10-digit mobile number" maxlength="10"
+                    pattern="[0-9]{10}" inputmode="numeric" required autocomplete="tel">
+                </div>
+              </div>
+
+              <!-- Invisible reCAPTCHA container for Firebase Phone Auth -->
+              <div id="recaptcha-container"></div>
+
+              <button type="button" id="btn-send-control-otp" class="btn btn-primary control-submit-btn"
+                onclick="sendControlOtp()">
+                <span id="send-otp-btn-text"><i class="fa-solid fa-paper-plane"></i> Send OTP to Mobile</span>
+                <span id="send-otp-btn-loader" class="hidden"><i class="fa-solid fa-circle-notch fa-spin"></i> Sending
+                  SMS...</span>
+              </button>
             </div>
 
-            <!-- Password Field -->
-            <div class="form-group">
-              <label for="control-password"><i class="fa-solid fa-lock"></i> Secure Password</label>
-              <div class="input-icon-wrap password-wrap">
-                <input 
-                  type="password" 
-                  id="control-password" 
-                  required 
-                  placeholder="Enter access password" 
-                  autocomplete="current-password"
-                >
-                <button type="button" class="btn-toggle-pw" onclick="toggleControlPasswordVisibility()" title="Show/Hide Password">
-                  <i class="fa-solid fa-eye" id="control-pw-eye"></i>
+            <!-- Step 2: OTP Verification Input (shown once SMS is sent) -->
+            <div id="control-verify-step" class="hidden mt-3">
+              <div id="otp-sent-banner" class="otp-sent-banner">
+                <i class="fa-solid fa-comment-sms"></i>
+                <span id="otp-sent-banner-text">OTP has been sent to your mobile phone via SMS. Please check your
+                  messages.</span>
+              </div>
+
+              <div class="form-group mt-3">
+                <label for="control-otp-code"><i class="fa-solid fa-key"></i> Enter 6-Digit OTP Received on
+                  Mobile</label>
+                <div class="input-icon-wrap">
+                  <input type="text" id="control-otp-code" placeholder="Enter 6-digit OTP from SMS" maxlength="6"
+                    pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code">
+                </div>
+              </div>
+
+              <div id="control-otp-error" class="control-auth-error hidden">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span id="control-otp-error-text">Invalid OTP code. Please try again.</span>
+              </div>
+
+              <button type="submit" id="btn-verify-control-otp" class="btn btn-primary control-submit-btn">
+                <span id="verify-otp-btn-text"><i class="fa-solid fa-circle-check"></i> Verify &amp; Access
+                  Console</span>
+                <span id="verify-otp-btn-loader" class="hidden"><i class="fa-solid fa-circle-notch fa-spin"></i>
+                  Verifying...</span>
+              </button>
+
+              <div class="otp-resend-row mt-3">
+                <span class="text-muted" id="otp-timer-text">Resend SMS in <b id="otp-countdown">30</b>s</span>
+                <button type="button" id="btn-resend-otp" class="btn-link hidden" onclick="sendControlOtp()">Resend
+                  OTP</button>
+              </div>
+
+              <div class="otp-back-row mt-3">
+                <button type="button" class="btn-back-pw" onclick="resetToPhoneStep()">
+                  <i class="fa-solid fa-arrow-left"></i> Change Mobile Number / ID
                 </button>
               </div>
             </div>
-
-            <!-- Submit Button -->
-            <button type="submit" id="control-login-btn" class="btn btn-primary control-submit-btn">
-              <span id="control-btn-text"><i class="fa-solid fa-arrow-right-to-bracket"></i> Authenticate & Enter Console</span>
-              <span id="control-btn-loader" class="hidden"><i class="fa-solid fa-circle-notch fa-spin"></i> Verifying Credentials...</span>
-            </button>
           </form>
 
           <div class="control-auth-footer">
             <div class="security-notice">
-              <i class="fa-solid fa-fingerprint"></i> End-to-end authenticated session. Unauthorized access attempts are monitored and recorded.
+              <i class="fa-solid fa-fingerprint"></i> End-to-end 2FA authenticated session. An SMS OTP will be
+              dispatched to your authorized mobile device.
             </div>
             <div class="demo-credentials-hint">
-              <i class="fa-solid fa-circle-info text-cyan"></i> Demo Credentials: <code>controller</code> / <code>Admin@Rail2026!</code>
+              <i class="fa-solid fa-circle-info text-cyan"></i> Control Access: Enter your 12-digit Employee ID and
+              Mobile Number to receive SMS OTP.
             </div>
           </div>
         </div>
@@ -433,16 +489,21 @@
           <div class="control-top-bar">
             <div class="ctrl-session-badge">
               <i class="fa-solid fa-shield-check text-success"></i>
-              <span>Active Console: <strong id="ctrl-logged-in-user">Northern Zone Controller</strong> (<span id="ctrl-logged-in-role">controller</span>)</span>
+              <span>Active Console: <strong id="ctrl-logged-in-user">Northern Zone Controller</strong> (<span
+                  id="ctrl-logged-in-role">controller</span>)</span>
             </div>
-            <button type="button" class="btn-ctrl-logout" onclick="handleControlLogout()" title="Lock Control Room and Sign Out">
+            <button type="button" class="btn-ctrl-logout" onclick="handleControlLogout()"
+              title="Lock Control Room and Sign Out">
               <i class="fa-solid fa-arrow-right-from-bracket"></i> Lock & Log Out
             </button>
           </div>
+          <div id="recaptcha-container"></div>
           <div class="control-header-bar">
             <div>
-              <h2><i class="fa-solid fa-tower-broadcast text-danger"></i> Division Traffic Control &amp; Propagation Room</h2>
-              <p class="text-muted">Real-time corridor headway monitoring, delay cascade analysis, and field telemetry console.</p>
+              <h2><i class="fa-solid fa-tower-broadcast text-danger"></i> Division Traffic Control &amp; Propagation
+                Room</h2>
+              <p class="text-muted">Real-time corridor headway monitoring, delay cascade analysis, and field telemetry
+                console.</p>
             </div>
             <div class="ctrl-kpi-row">
               <div class="kpi-card">
@@ -522,7 +583,9 @@
                 </div>
                 <div class="form-group full-width">
                   <label>Field Notes / Description</label>
-                  <input type="text" id="obs-desc" required placeholder="Describe on-ground track or signalling observation..." value="Cautious running advised due to track ballast packing machine ahead.">
+                  <input type="text" id="obs-desc" required
+                    placeholder="Describe on-ground track or signalling observation..."
+                    value="Cautious running advised due to track ballast packing machine ahead.">
                 </div>
                 <div class="form-group full-width">
                   <button type="submit" class="btn btn-primary">
@@ -547,7 +610,7 @@
         <button class="close-btn" onclick="closeAuthModal()">&times;</button>
       </div>
       <div class="modal-body">
-        
+
         <!-- Profile Card View (Shown for Logged In User) -->
         <div id="profile-view-section" class="profile-card-modal hidden">
           <div class="profile-header-card">
@@ -559,7 +622,7 @@
               <p id="profile-user-email" class="profile-email">passenger@railnirdeshak.in</p>
             </div>
           </div>
-          
+
           <div class="profile-details-list mt-3">
             <div class="profile-detail-item">
               <span class="detail-label"><i class="fa-solid fa-shield-halved"></i> Role</span>
@@ -570,7 +633,8 @@
               <span id="profile-saved-count" class="badge-tag">0 Trains</span>
             </div>
             <div class="profile-detail-item">
-              <span class="detail-label"><i class="fa-solid fa-circle-check" style="color:var(--success);"></i> Session Status</span>
+              <span class="detail-label"><i class="fa-solid fa-circle-check" style="color:var(--success);"></i> Session
+                Status</span>
               <span class="badge-tag" style="color:var(--success); border-color:var(--success);">Authenticated</span>
             </div>
           </div>
@@ -592,7 +656,8 @@
         <form id="login-form" onsubmit="handleLogin(event)" class="auth-form mt-3">
           <div class="form-group">
             <label>Email Address</label>
-            <input type="email" id="login-email" required placeholder="passenger@railnirdeshak.in" value="passenger@railnirdeshak.in">
+            <input type="email" id="login-email" required placeholder="passenger@railnirdeshak.in"
+              value="passenger@railnirdeshak.in">
           </div>
           <div class="form-group">
             <label>Password</label>
@@ -633,6 +698,29 @@
 
   <!-- Scripts -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "firebase/app";
+  import { getAnalytics } from "firebase/analytics";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  const firebaseConfig = {
+  apiKey: "AIzaSyCf0ljc0-ppBcwhh8gXEeHAWP-wSQGLjmg",
+  authDomain: "rail-nirdeshak.firebaseapp.com",
+  projectId: "rail-nirdeshak",
+  storageBucket: "rail-nirdeshak.firebasestorage.app",
+  messagingSenderId: "724629020533",
+  appId: "1:724629020533:web:e1f98f8e9bb42e37d9bd3c",
+  measurementId: "G-PVVWQEPLXT"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+
   <script src="app.js?v=5"></script>
 </body>
+
 </html>

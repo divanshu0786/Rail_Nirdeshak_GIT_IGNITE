@@ -1842,3 +1842,143 @@ body {
   color: #ffffff;
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
+
+
+/* Control Room Mobile OTP Form & In-Box Styling */
+.control-otp-section {
+  animation: fadeIn 0.3s ease;
+}
+
+.control-otp-alert {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  text-align: left;
+}
+
+.control-otp-alert i {
+  font-size: 1.25rem;
+  margin-top: 0.15rem;
+  color: #fbbf24;
+}
+
+.control-otp-alert strong {
+  display: block;
+  color: #fbbf24;
+  font-size: 0.9rem;
+  margin-bottom: 0.2rem;
+}
+
+.control-otp-alert p {
+  color: #cbd5e1;
+  font-size: 0.8rem;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.input-phone-wrap {
+  display: flex;
+  align-items: center;
+  background: #1e293b;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.input-phone-wrap:focus-within {
+  border-color: #06b6d4;
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.15);
+  background: #192338;
+}
+
+.country-prefix {
+  background: rgba(15, 23, 42, 0.6);
+  padding: 0.75rem 0.9rem;
+  font-weight: 600;
+  color: #38bdf8;
+  border-right: 1px solid rgba(148, 163, 184, 0.2);
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+}
+
+.input-phone-wrap input {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0.75rem 1rem;
+  font-size: 1.05rem;
+  letter-spacing: 1px;
+  color: #f8fafc;
+  width: 100%;
+}
+
+.input-phone-wrap input:focus {
+  outline: none;
+}
+
+.otp-sent-banner {
+  background: rgba(6, 182, 212, 0.15);
+  border: 1px solid rgba(6, 182, 212, 0.4);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: #67e8f9;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.otp-sent-banner i {
+  color: #06b6d4;
+  font-size: 1.1rem;
+}
+
+.otp-resend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  padding: 0 0.25rem;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: #38bdf8;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.82rem;
+  text-decoration: underline;
+}
+
+.btn-link:hover {
+  color: #7dd3fc;
+}
+
+.otp-back-row {
+  text-align: center;
+}
+
+.btn-back-pw {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.82rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: color 0.2s ease;
+}
+
+.btn-back-pw:hover {
+  color: #f8fafc;
+}
