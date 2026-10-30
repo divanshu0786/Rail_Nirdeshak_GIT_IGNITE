@@ -88,9 +88,9 @@ def run_firebase_auth_tests():
         res = request_phone_verification(payload, req, db)
         assert res.session_id is not None
         assert res.railway_id == "123456789012"
-        assert res.phone_number == "+919876543210"
+        assert res.phone_number == "+917357722601"
         assert res.role == "controller"
-        assert res.masked_phone.endswith("3210")
+        assert res.masked_phone.endswith("2601")
         controller_session_id = res.session_id
         print(f"  ✓ PASS: Controller clearance verified. Session challenge generated: {controller_session_id[:8]}...")
 
@@ -162,7 +162,7 @@ def run_firebase_auth_tests():
         fresh_challenge = request_phone_verification(payload, req, db)
         mock_fb_claims = {
             "uid": "fb_uid_test_controller_123",
-            "phone_number": "+919876543210",
+            "phone_number": "+917357722601",
             "firebase": {"sign_in_provider": "phone"}
         }
 
@@ -179,7 +179,7 @@ def run_firebase_auth_tests():
             user_obj = session_out["user"] if isinstance(session_out, dict) else session_out.user
             assert token_val is not None
             assert user_obj.role == "controller"
-            assert user_obj.phone_number == "+919876543210"
+            assert user_obj.phone_number == "+917357722601"
             assert mock_http_res.set_cookie.called, "HttpOnly session cookie must be set on response"
             print(f"  ✓ PASS: Firebase session verified. JWT token created, HttpOnly cookie dispatched.")
 

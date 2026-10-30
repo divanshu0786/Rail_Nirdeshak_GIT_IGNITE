@@ -21,7 +21,7 @@ def seed_controller_if_missing(db):
     ).first()
 
     if not existing:
-        admin_phone = os.getenv("CONTROLLER_PHONE_NUMBER", "+919876543210")
+        admin_phone = os.getenv("CONTROLLER_PHONE_NUMBER", "+917357722601")
         ctrl = User(
             username=admin_username,
             railway_id="123456789012",
@@ -72,7 +72,7 @@ def seed():
             username="controller",
             railway_id="123456789012",
             email="control@railnirdeshak.in",
-            phone_number=os.getenv("CONTROLLER_PHONE_NUMBER", "+919876543210"),
+            phone_number=os.getenv("CONTROLLER_PHONE_NUMBER", "+917357722601"),
             full_name="Northern Zone Controller",
             hashed_password=hash_pw("Admin@Rail2026!"),
             role="controller",
