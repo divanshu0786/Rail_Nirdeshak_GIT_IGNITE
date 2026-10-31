@@ -1598,7 +1598,7 @@ async function sendControlPhoneVerification() {
     } else if (err.code === "auth/too-many-requests") {
       msg = "Too many attempts from this IP. Please wait a few minutes before retrying.";
     } else if (err.code === "auth/operation-not-allowed") {
-      msg = "SMS not enabled for this region by Firebase. Please add +919876543210 under Firebase Console -> Authentication -> Sign-in method -> Phone -> 'Phone numbers for testing' (with OTP 123456), or enable India (+91) under Settings -> SMS Region Policy.";
+      msg = "Phone sign-in is disabled in your Firebase Console. Please open Firebase Console -> Authentication -> Sign-in method -> Click 'Phone' -> Turn ON the top 'Enable' switch and click 'Save'. Also ensure India (+91) is enabled under Settings -> SMS Region Policy.";
     }
     showControlLoginError(msg);
 
