@@ -243,4 +243,5 @@ The repository contains `Procfile` and `Dockerfile` ready for zero-config one-cl
 - **Data Modeling & Field Survey Integration**: Northern Railway corridor dataset, physical pole references, and on-ground track survey logging.
 
 ---
-*Built for the Scratch to Hack Hackathon 2026.*
+*Built for the Scratch to Hack Hackathon 2026.*#   R a i l - N i r d e s h a k _ G i t - I g n i t e  
+ 
