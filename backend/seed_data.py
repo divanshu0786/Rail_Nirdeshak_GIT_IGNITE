@@ -78,6 +78,16 @@ def seed():
             role="controller",
             is_active=True
         )
+        controller_section = User(
+            username="controller_section",
+            railway_id="123456789010",
+            email="control.section@railnirdeshak.in",
+            phone_number="+919876543210",
+            full_name="Corridor Traffic Controller",
+            hashed_password=hash_pw("Admin@Rail2026!"),
+            role="controller",
+            is_active=True
+        )
         admin_user = User(
             username="admin",
             railway_id="987654321098",
@@ -88,7 +98,7 @@ def seed():
             role="admin",
             is_active=True
         )
-        db.add_all([demo_user, controller_user, admin_user])
+        db.add_all([demo_user, controller_user, controller_section, admin_user])
         db.commit()
 
         # 2. Stations

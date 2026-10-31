@@ -401,17 +401,15 @@
             <!-- Step 1: Officer 12-Digit Railway ID -->
             <div id="control-phone-step">
               <div class="form-group">
-                <label for="control-railway-id"><i class="fa-solid fa-id-card"></i> 12-Digit Official Railway ID</label>
+                <label for="control-railway-id"><i class="fa-solid fa-id-card"></i> Official Railway ID or Registered Mobile</label>
                 <div class="input-icon-wrap">
                   <input
                     type="text"
                     id="control-railway-id"
                     name="railway_id"
                     required
-                    placeholder="Enter 12-digit Railway ID (e.g. 123456789012)"
-                    maxlength="12"
-                    pattern="[0-9]{12}"
-                    inputmode="numeric"
+                    placeholder="Enter 12-digit Railway ID or Registered Mobile"
+                    maxlength="32"
                     autocomplete="username"
                     onkeydown="if(event.key === 'Enter'){ event.preventDefault(); sendControlPhoneVerification(); }"
                   >
@@ -439,6 +437,11 @@
                     <strong>Zone Controller</strong>
                     <code>123456789012</code>
                     <small class="text-cyan">+91 ••••• •2601</small>
+                  </button>
+                  <button type="button" class="quick-cred-btn" onclick="quickFillRailwayId('123456789010')">
+                    <strong>Section Controller</strong>
+                    <code>123456789010</code>
+                    <small class="text-cyan">+91 ••••• •3210</small>
                   </button>
                   <button type="button" class="quick-cred-btn" onclick="quickFillRailwayId('987654321098')">
                     <strong>DRM Admin</strong>
@@ -509,7 +512,7 @@
               <i class="fa-solid fa-fingerprint"></i> Two-Factor Authenticated Session (2FA). SMS OTP is dispatched directly to the official mobile number on railway registry records via Firebase.
             </div>
             <div class="demo-credentials-hint">
-              <i class="fa-solid fa-circle-info text-cyan"></i> Official Security: Enter your 12-digit Railway ID to verify permissions and receive SMS OTP.
+              <i class="fa-solid fa-circle-info text-cyan"></i> Official Security: Enter your 12-digit Railway ID (123456789012) or registered mobile (+917357722601) to receive SMS OTP.
             </div>
           </div>
         </div>
@@ -521,15 +524,14 @@
           <div class="control-top-bar">
             <div class="ctrl-session-badge">
               <i class="fa-solid fa-shield-check text-success"></i>
-              <span>Active Console: <strong id="ctrl-logged-in-user">Northern Zone Controller</strong> (<span
-                  id="ctrl-logged-in-role">controller</span>)</span>
+              <span>Active Console: <strong id="ctrl-logged-in-user">—</strong> (<span
+                  id="ctrl-logged-in-role">—</span>)</span>
             </div>
             <button type="button" class="btn-ctrl-logout" onclick="handleControlLogout()"
               title="Lock Control Room and Sign Out">
               <i class="fa-solid fa-arrow-right-from-bracket"></i> Lock & Log Out
             </button>
           </div>
-          <div id="recaptcha-container"></div>
           <div class="control-header-bar">
             <div>
               <h2><i class="fa-solid fa-tower-broadcast text-danger"></i> Division Traffic Control &amp; Propagation
@@ -539,19 +541,19 @@
             </div>
             <div class="ctrl-kpi-row">
               <div class="kpi-card">
-                <span class="kpi-num text-cyan" id="kpi-active-trains">2</span>
+                <span class="kpi-num text-cyan" id="kpi-active-trains">0</span>
                 <span class="kpi-label">Active Trains</span>
               </div>
               <div class="kpi-card">
-                <span class="kpi-num text-amber" id="kpi-delayed-trains">2</span>
+                <span class="kpi-num text-amber" id="kpi-delayed-trains">0</span>
                 <span class="kpi-label">Delayed Trains</span>
               </div>
               <div class="kpi-card">
-                <span class="kpi-num text-danger" id="kpi-prop-risks">1</span>
+                <span class="kpi-num text-danger" id="kpi-prop-risks">0</span>
                 <span class="kpi-label">Propagation Alerts</span>
               </div>
               <div class="kpi-card">
-                <span class="kpi-num text-purple" id="kpi-field-alerts">2</span>
+                <span class="kpi-num text-purple" id="kpi-field-alerts">0</span>
                 <span class="kpi-label">Field Observations</span>
               </div>
             </div>

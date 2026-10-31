@@ -262,7 +262,7 @@ def run_firebase_auth_tests():
         cfg = get_app_config()
         assert "firebase" in cfg
         assert "projectId" in cfg["firebase"]
-        assert cfg["firebase"]["projectId"] == "rail-nirdeshak"
+        assert cfg["firebase"]["projectId"] in ["rail-nirdeshak-47387", "rail-nirdeshak"]
         assert "apiKey" in cfg["firebase"]
         print(f"  ✓ PASS: /api/config correctly returns public Firebase client configuration.")
 

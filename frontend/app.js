@@ -4,7 +4,8 @@ function resolveApiBase() {
 
   if (window.__API_BASE__) return window.__API_BASE__;
   if (window.localStorage && localStorage.getItem("rn_api_base")) {
-    return localStorage.getItem("rn_api_base");
+    const saved = localStorage.getItem("rn_api_base");
+    if (saved && !saved.startsWith("file:")) return saved;
   }
 
   const { protocol, hostname, origin, port } = window.location;
@@ -23,10 +24,64 @@ function resolveApiBase() {
   return origin;
 }
 
+let activeApiBase = resolveApiBase();
+
+function getApiBase() {
+  return activeApiBase;
+}
+
+function setApiBase(newBase) {
+  if (!newBase || newBase.startsWith("file:")) return;
+  activeApiBase = newBase;
+  try {
+    localStorage.setItem("rn_api_base", newBase);
+  } catch (_) { }
+}
+
+function getWsBase() {
+  const base = getApiBase();
+  return base.startsWith("https://")
+    ? base.replace(/^https:\/\//, "wss://")
+    : base.replace(/^http:\/\//, "ws://");
+}
+
+// Global dynamic fetch with multi-port fallback support
+async function dynamicFetch(path, options = {}) {
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return fetch(path, options);
+  }
+
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  const origin = (typeof window !== "undefined" && window.location) ? window.location.origin : "http://127.0.0.1:8000";
+
+  const candidates = Array.from(new Set([
+    activeApiBase,
+    origin,
+    "http://127.0.0.1:8000",
+    "http://127.0.0.1:8001",
+    "http://127.0.0.1:8080"
+  ])).filter(b => b && !b.startsWith("file:"));
+
+  let lastErr = null;
+  for (const base of candidates) {
+    const fullUrl = `${base}${cleanPath}`;
+    try {
+      const res = await fetch(fullUrl, options);
+      if (res.status !== 404 && res.status !== 405) {
+        setApiBase(base);
+        return res;
+      }
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  if (lastErr) throw lastErr;
+  return fetch(`${getApiBase()}${cleanPath}`, options);
+}
+
 const API_BASE = resolveApiBase();
-const WS_BASE = API_BASE.startsWith("https://")
-  ? API_BASE.replace(/^https:\/\//, "wss://")
-  : API_BASE.replace(/^http:\/\//, "ws://");
+const WS_BASE = getWsBase();
 
 let state = {
   user: null,
@@ -62,7 +117,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function loadAppConfig() {
   try {
-    const res = await fetch(`${API_BASE}/api/config`);
+    const res = await dynamicFetch("/api/config");
     if (res.ok) {
       state.config = await res.json();
     }
@@ -1294,12 +1349,13 @@ function getFirebaseConfig() {
     return state.config.firebase;
   }
   return {
-    apiKey: "AIzaSyCf0ljc0-ppBcwhh8gXEeHAWP-wSQGLjmg",
-    authDomain: "rail-nirdeshak.firebaseapp.com",
-    projectId: "rail-nirdeshak",
-    storageBucket: "rail-nirdeshak.appspot.com",
-    messagingSenderId: "724629020533",
-    appId: "1:724629020533:web:e1f98f8e9bb42e37d9bd3c"
+    apiKey: "AIzaSyC8fLIyVIZcOB1wMMM11FDY7mOsafs8NEo",
+    authDomain: "rail-nirdeshak-47387.firebaseapp.com",
+    projectId: "rail-nirdeshak-47387",
+    storageBucket: "rail-nirdeshak-47387.firebasestorage.app",
+    messagingSenderId: "925306774424",
+    appId: "1:925306774424:web:083fa5dc4f22b5e2ef81ed",
+    measurementId: "G-K9TGP73Q0F"
   };
 }
 
@@ -1445,10 +1501,10 @@ async function sendControlPhoneVerification() {
   const btnText = document.getElementById("send-otp-btn-text");
   const btnLoader = document.getElementById("send-otp-btn-loader");
 
-  const railwayId = (idInput ? idInput.value : "").trim();
+  const rawInput = (idInput ? idInput.value : "").trim();
 
-  if (!railwayId || !/^\d{12}$/.test(railwayId)) {
-    showControlLoginError("Please enter a valid 12-digit Official Railway ID.");
+  if (!rawInput || rawInput.length < 3) {
+    showControlLoginError("Please enter your 12-digit Railway ID or registered mobile number.");
     if (idInput) idInput.focus();
     return;
   }
@@ -1459,29 +1515,18 @@ async function sendControlPhoneVerification() {
   if (btnLoader) btnLoader.classList.remove("hidden");
 
   try {
-    // 1. Verify Railway ID against trusted backend registry
+    // 1. Verify Railway ID or Mobile against trusted backend registry
     let res = null;
     let data = {};
-    const endpointsToTry = [
-      `${API_BASE}/api/auth/request-phone-verification`,
-      `${API_BASE}/auth/request-phone-verification`,
-      `http://127.0.0.1:8000/api/auth/request-phone-verification`,
-      `http://127.0.0.1:8001/api/auth/request-phone-verification`
-    ];
-
-    for (const url of endpointsToTry) {
-      try {
-        const attempt = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ railway_id: railwayId })
-        });
-        if (attempt.status !== 404 && attempt.status !== 405) {
-          res = attempt;
-          data = await attempt.json().catch(() => ({}));
-          break;
-        }
-      } catch (_) { }
+    try {
+      res = await dynamicFetch("/api/auth/request-phone-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ railway_id: rawInput })
+      });
+      data = await res.json().catch(() => ({}));
+    } catch (netErr) {
+      console.warn("dynamicFetch phone request err:", netErr);
     }
 
     if (!res || !res.ok) {
@@ -1629,31 +1674,20 @@ async function handleControlOtpSubmit(e) {
     // 3. Submit Firebase ID token and challenge session ID to FastAPI backend
     let res = null;
     let result = {};
-    const verifyEndpoints = [
-      `${API_BASE}/api/auth/verify-firebase-session`,
-      `${API_BASE}/auth/verify-firebase-session`,
-      `http://127.0.0.1:8000/api/auth/verify-firebase-session`,
-      `http://127.0.0.1:8001/api/auth/verify-firebase-session`
-    ];
-
-    for (const vUrl of verifyEndpoints) {
-      try {
-        const attempt = await fetch(vUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            id_token: idToken,
-            session_id: state.pendingChallenge.session_id,
-            railway_id: state.pendingChallenge.railway_id
-          })
-        });
-        if (attempt.status !== 404 && attempt.status !== 405) {
-          res = attempt;
-          result = await attempt.json().catch(() => ({}));
-          break;
-        }
-      } catch (_) { }
+    try {
+      res = await dynamicFetch("/api/auth/verify-firebase-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          id_token: idToken,
+          session_id: state.pendingChallenge.session_id,
+          railway_id: state.pendingChallenge.railway_id
+        })
+      });
+      result = await res.json().catch(() => ({}));
+    } catch (vErr) {
+      console.warn("dynamicFetch verify error:", vErr);
     }
 
     if (!res.ok) {
@@ -1769,7 +1803,7 @@ async function loadControlRoom() {
     headers["Authorization"] = `Bearer ${token}`;
   }
   try {
-    const res = await fetch(`${API_BASE}/api/control-room/overview`, {
+    const res = await dynamicFetch("/api/control-room/overview", {
       headers: headers,
       credentials: "include"
     });
@@ -1847,7 +1881,7 @@ async function submitFieldObservation(e) {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/api/field-observations`, {
+    const res = await dynamicFetch("/api/field-observations", {
       method: "POST",
       headers: headers,
       credentials: "include",
@@ -1885,7 +1919,7 @@ function connectControlWebSocket() {
 
   const token = getControllerToken();
   const tokenParam = (token && token !== "cookie_session") ? `?token=${encodeURIComponent(token)}` : "";
-  const ctrlWsUrl = `${WS_BASE}/ws/control-room${tokenParam}`;
+  const ctrlWsUrl = `${getWsBase()}/ws/control-room${tokenParam}`;
   try {
     state.controlWs = new WebSocket(ctrlWsUrl);
     state.controlWs.onopen = () => {

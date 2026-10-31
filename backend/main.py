@@ -95,12 +95,13 @@ def get_app_config():
         "map_api_key": os.getenv("MAP_API_KEY", os.getenv("MAPTILER_API_KEY", "")),
         "has_weather_api": bool(os.getenv("OPENWEATHERMAP_API_KEY")),
         "firebase": {
-            "apiKey": os.getenv("FIREBASE_API_KEY", "AIzaSyCf0ljc0-ppBcwhh8gXEeHAWP-wSQGLjmg"),
-            "authDomain": os.getenv("FIREBASE_AUTH_DOMAIN", "rail-nirdeshak.firebaseapp.com"),
-            "projectId": os.getenv("FIREBASE_PROJECT_ID", "rail-nirdeshak"),
-            "storageBucket": os.getenv("FIREBASE_STORAGE_BUCKET", "rail-nirdeshak.firebasestorage.app"),
-            "messagingSenderId": os.getenv("FIREBASE_MESSAGING_SENDER_ID", "724629020533"),
-            "appId": os.getenv("FIREBASE_APP_ID", "1:724629020533:web:e1f98f8e9bb42e37d9bd3c")
+            "apiKey": os.getenv("FIREBASE_API_KEY", "AIzaSyC8fLIyVIZcOB1wMMM11FDY7mOsafs8NEo"),
+            "authDomain": os.getenv("FIREBASE_AUTH_DOMAIN", "rail-nirdeshak-47387.firebaseapp.com"),
+            "projectId": os.getenv("FIREBASE_PROJECT_ID", "rail-nirdeshak-47387"),
+            "storageBucket": os.getenv("FIREBASE_STORAGE_BUCKET", "rail-nirdeshak-47387.firebasestorage.app"),
+            "messagingSenderId": os.getenv("FIREBASE_MESSAGING_SENDER_ID", "925306774424"),
+            "appId": os.getenv("FIREBASE_APP_ID", "1:925306774424:web:083fa5dc4f22b5e2ef81ed"),
+            "measurementId": os.getenv("FIREBASE_MEASUREMENT_ID", "G-K9TGP73Q0F")
         }
     }
 
@@ -206,29 +207,50 @@ def request_phone_verification(req: schemas.PhoneVerificationRequest, request: R
     5. Returns single-use session challenge and masked phone for client Firebase auth.
     """
     import re
-    railway_id = (req.railway_id or "").strip()
-    if not re.fullmatch(r"^\d{12}$", railway_id):
+    ident = (req.railway_id or "").strip()
+    if not ident:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Please enter a valid 12-digit Railway ID (numeric only)."
+            detail="Please enter your 12-digit Railway ID or registered mobile number."
         )
 
     # Rate limiting protection against SMS abuse
     client_ip = request.client.host if request.client else "unknown"
-    rate_limited, wait_sec = is_phone_request_rate_limited(f"{client_ip}:{railway_id}")
+    rate_limited, wait_sec = is_phone_request_rate_limited(f"{client_ip}:{ident}")
     if rate_limited:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Too many verification requests. Please wait {wait_sec} seconds before trying again."
         )
-    record_phone_request_attempt(f"{client_ip}:{railway_id}")
+    record_phone_request_attempt(f"{client_ip}:{ident}")
 
-    # Query officer by 12-digit Railway ID
-    officer = db.query(models.User).filter(models.User.railway_id == railway_id).first()
+    # Query officer: support 12-digit Railway ID, registered phone number, username, or email
+    clean_digits = re.sub(r"\D", "", ident)
+    norm_phone = normalize_phone_number(ident) if len(clean_digits) >= 10 else None
+
+    officer = None
+    # 1. Exact match by railway_id
+    officer = db.query(models.User).filter(models.User.railway_id == ident).first()
+
+    # 2. Match by normalized phone or last 10 digits
+    if not officer and norm_phone:
+        officer = db.query(models.User).filter(
+            (models.User.phone_number == norm_phone) |
+            (models.User.phone_number.like(f"%{clean_digits[-10:]}"))
+        ).first()
+
+    # 3. Match by username
+    if not officer:
+        officer = db.query(models.User).filter(models.User.username == ident.lower()).first()
+
+    # 4. Match by email
+    if not officer:
+        officer = db.query(models.User).filter(models.User.email == ident.lower()).first()
+
     if not officer:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Official Railway ID not found in authorized personnel registry."
+            detail="Officer identifier not found in authorized personnel registry."
         )
 
     if not officer.is_active:
@@ -247,8 +269,7 @@ def request_phone_verification(req: schemas.PhoneVerificationRequest, request: R
     # Check registered phone number
     raw_phone = officer.phone_number
     if not raw_phone:
-        # Default fallback to configured official number
-        default_phone = os.getenv("CONTROLLER_PHONE_NUMBER", "+919876543210")
+        default_phone = os.getenv("CONTROLLER_PHONE_NUMBER", "+917357722601")
         officer.phone_number = default_phone
         db.commit()
         db.refresh(officer)
@@ -256,13 +277,14 @@ def request_phone_verification(req: schemas.PhoneVerificationRequest, request: R
 
     phone = normalize_phone_number(raw_phone)
     masked = mask_phone_number(phone)
+    canonical_railway_id = officer.railway_id or ident
 
     # Create secure single-use session challenge (10-minute TTL)
-    session_id = create_phone_verification_session(railway_id, phone, officer.id)
+    session_id = create_phone_verification_session(canonical_railway_id, phone, officer.id)
 
     return schemas.PhoneVerificationResponse(
         session_id=session_id,
-        railway_id=officer.railway_id or railway_id,
+        railway_id=canonical_railway_id,
         masked_phone=masked,
         phone_number=phone,
         officer_name=officer.full_name,
@@ -322,6 +344,17 @@ def verify_firebase_session(req: schemas.FirebaseSessionVerifyRequest, response:
 
     # 3. Lookup officer record in trusted database
     officer = db.query(models.User).filter(models.User.railway_id == railway_id).first()
+    if not officer:
+        clean_digits = re.sub(r"\D", "", railway_id)
+        norm_phone = normalize_phone_number(railway_id) if len(clean_digits) >= 10 else None
+        if norm_phone:
+            officer = db.query(models.User).filter(
+                (models.User.phone_number == norm_phone) |
+                (models.User.phone_number.like(f"%{clean_digits[-10:]}"))
+            ).first()
+        if not officer:
+            officer = db.query(models.User).filter(models.User.username == railway_id.lower()).first()
+
     if not officer:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -804,11 +837,13 @@ def remove_saved_train(train_id: int, user: models.User = Depends(require_curren
 
 # ----------------- FIELD OBSERVATIONS (PROTECTED CONTROLLER API) -----------------
 @app.get("/api/field-observations", response_model=List[schemas.FieldObservationOut])
+@app.get("/field-observations", response_model=List[schemas.FieldObservationOut])
 def get_field_observations(limit: int = 10, db: Session = Depends(get_db)):
     """Public read-only field observation highlights for track visualization."""
     return db.query(models.FieldObservation).order_by(models.FieldObservation.reported_at.desc()).limit(limit).all()
 
 @app.post("/api/field-observations", response_model=schemas.FieldObservationOut)
+@app.post("/field-observations", response_model=schemas.FieldObservationOut)
 def create_field_observation(
     obs_in: schemas.FieldObservationCreate,
     user: models.User = Depends(require_controller_user),
@@ -836,6 +871,7 @@ def get_weather_data(lat: float = 28.6427, lon: float = 77.2195, location: Optio
 
 # ----------------- CONTROL ROOM OVERVIEW (PROTECTED CONTROLLER API) -----------------
 @app.get("/api/control-room/overview")
+@app.get("/control-room/overview")
 def get_control_room_overview(
     user: models.User = Depends(require_controller_user),
     db: Session = Depends(get_db)
@@ -913,6 +949,7 @@ async def websocket_train_endpoint(websocket: WebSocket, train_id: int):
         manager.disconnect_train(websocket, train_id)
 
 @app.websocket("/ws/control-room")
+@app.websocket("/api/ws/control-room")
 async def websocket_control_endpoint(
     websocket: WebSocket,
     token: Optional[str] = Query(None),
